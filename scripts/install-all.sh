@@ -28,6 +28,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NVME_DEVICE="/dev/nvme0n1"
 SKIP_STORAGE=false
 SKIP_FIREWALL=false
+SKIP_AP=false
 SKIP_SERVICES=false
 
 while [[ $# -gt 0 ]]; do
@@ -35,6 +36,7 @@ while [[ $# -gt 0 ]]; do
         --nvme-device)   NVME_DEVICE="$2"; shift 2 ;;
         --skip-storage)  SKIP_STORAGE=true; shift ;;
         --skip-firewall) SKIP_FIREWALL=true; shift ;;
+        --skip-ap)       SKIP_AP=true; shift ;;
         --skip-services) SKIP_SERVICES=true; shift ;;
         -h|--help)
             sed -n '/^# install-all/,/^[^#]/p' "$0" | grep '^#' | sed 's/^# \?//'
@@ -52,7 +54,7 @@ section() { echo; echo "══════════════════�
 
 # ── 1. Storage ────────────────────────────────────────────────────────────────
 
-section "1/4  Storage"
+section "1/5  Storage"
 if [[ "${SKIP_STORAGE}" == true ]]; then
     echo "  skipping (--skip-storage)"
 else
@@ -61,25 +63,34 @@ fi
 
 # ── 2. Firewall + Caddy config ────────────────────────────────────────────────
 
-section "2/4  Firewall"
+section "2/5  Firewall"
 if [[ "${SKIP_FIREWALL}" == true ]]; then
     echo "  skipping (--skip-firewall)"
 else
     bash "${SCRIPT_DIR}/install-firewall.sh"
 fi
 
-# ── 3. Service quadlets ───────────────────────────────────────────────────────
+# ── 3. WiFi access point ──────────────────────────────────────────────────────
 
-section "3/4  Services"
+section "3/5  WiFi access point"
+if [[ "${SKIP_AP}" == true ]]; then
+    echo "  skipping (--skip-ap)"
+else
+    bash "${SCRIPT_DIR}/install-ap.sh"
+fi
+
+# ── 4. Service quadlets ───────────────────────────────────────────────────────
+
+section "4/5  Services"
 if [[ "${SKIP_SERVICES}" == true ]]; then
     echo "  skipping (--skip-services)"
 else
     bash "${SCRIPT_DIR}/install-services.sh"
 fi
 
-# ── 4. Enable and start all services ─────────────────────────────────────────
+# ── 5. Enable and start all services ─────────────────────────────────────────
 
-section "4/4  Starting services"
+section "5/5  Starting services"
 
 # Reload to pick up any newly installed quadlets / systemd units
 systemctl daemon-reload

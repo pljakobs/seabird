@@ -36,6 +36,7 @@ TMPDIR_MOUNT="/mnt/seabird-setup"
 
 declare -A SUBVOLS=(
     [@journal]="/var/log/journal"
+    [@containers-storage]="/var/lib/containers"
     [@containers-vol]="/var/lib/containers/volumes"
     [@data-signalk]="/srv/seabird/signalk"
     [@data-influxdb]="/srv/seabird/influxdb"

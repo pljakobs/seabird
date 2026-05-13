@@ -65,6 +65,7 @@ All subvolumes mounted with `noatime,compress=zstd:1,space_cache=v2`
 | Subvolume | Mount point | Purpose |
 |-----------|-------------|---------|
 | `@journal` | `/var/log/journal` | systemd-journald (10GB cap) |
+| `@containers-storage` | `/var/lib/containers` | podman image storage (moved off eMMC) |
 | `@containers-vol` | `/var/lib/containers/volumes` | podman volume data |
 | `@data-signalk` | `/srv/seabird/signalk` | Signal-K data |
 | `@data-influxdb` | `/srv/seabird/influxdb` | InfluxDB data |
@@ -73,7 +74,7 @@ All subvolumes mounted with `noatime,compress=zstd:1,space_cache=v2`
 | `@backup` | `/srv/seabird/backup` | local backups |
 | `@snapshots` | (unmounted) | snapper target |
 
-eMMC (unchanged): `/boot/efi` + `/boot` + LVM xfs root + `/var/lib/containers` (images)
+eMMC (unchanged): `/boot/efi` + `/boot` + LVM xfs root (OS only — container images on NVMe)
 
 ### 2.2 Install Script
 `scripts/install-storage.sh [/dev/nvme0n1]` — formats, creates subvolumes, writes fstab, configures journald.
