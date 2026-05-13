@@ -21,7 +21,7 @@ Environment=DOCKER_INFLUXDB_INIT_MODE=setup
 Environment=DOCKER_INFLUXDB_INIT_USERNAME=admin
 Environment=DOCKER_INFLUXDB_INIT_ORG=seabird
 Environment=DOCKER_INFLUXDB_INIT_BUCKET=signalk
-EnvironmentFile=-/etc/seabird/influxdb.env
+EnvironmentFile=/etc/seabird/influxdb.env
 
 [Service]
 Restart=on-failure

@@ -21,7 +21,7 @@ Environment=GF_SERVER_ROOT_URL=http://seabird.local:3001
 Environment=GF_AUTH_ANONYMOUS_ENABLED=true
 Environment=GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
 Environment=GF_SECURITY_ALLOW_EMBEDDING=true
-EnvironmentFile=-/etc/seabird/grafana.env
+EnvironmentFile=/etc/seabird/grafana.env
 
 [Service]
 Restart=on-failure
