@@ -18,11 +18,12 @@
 #   8. Print secrets reminder and next steps
 #
 # Options:
-#   --nvme-device DEV    NVMe device to use (default: /dev/nvme0n1)
-#   --no-hostname        Skip setting hostname to 'seabird'
-#   --skip-storage       Skip install-storage.sh (NVMe already set up)
-#   --skip-firewall      Skip install-firewall.sh
-#   --skip-services      Skip install-services.sh
+#   --nvme-device DEV        NVMe device to use (default: /dev/nvme0n1)
+#   --no-hostname            Skip setting hostname to 'seabird'
+#   --skip-storage           Skip install-storage.sh (NVMe already set up)
+#   --skip-firewall          Skip install-firewall.sh
+#   --skip-services          Skip install-services.sh
+#   --allow-wan-ssh=yes|no   Open SSH on WAN zone with fail2ban (default: no)
 #
 # Requirements:
 #   - Fedora 44 aarch64 on Raspberry Pi CM4
@@ -39,16 +40,25 @@ SET_HOSTNAME=true
 SKIP_STORAGE=false
 SKIP_FIREWALL=false
 SKIP_SERVICES=false
+ALLOW_WAN_SSH=no
 
 # ── argument parsing ──────────────────────────────────────────────────────────
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --nvme-device)   NVME_DEVICE="$2"; shift 2 ;;
-        --no-hostname)   SET_HOSTNAME=false; shift ;;
-        --skip-storage)  SKIP_STORAGE=true; shift ;;
-        --skip-firewall) SKIP_FIREWALL=true; shift ;;
-        --skip-services) SKIP_SERVICES=true; shift ;;
+        --nvme-device)       NVME_DEVICE="$2"; shift 2 ;;
+        --no-hostname)       SET_HOSTNAME=false; shift ;;
+        --skip-storage)      SKIP_STORAGE=true; shift ;;
+        --skip-firewall)     SKIP_FIREWALL=true; shift ;;
+        --skip-services)     SKIP_SERVICES=true; shift ;;
+        --allow-wan-ssh=yes) ALLOW_WAN_SSH=yes; shift ;;
+        --allow-wan-ssh=no)  ALLOW_WAN_SSH=no;  shift ;;
+        --allow-wan-ssh)
+            if [[ "${2:-}" == "yes" || "${2:-}" == "no" ]]; then
+                ALLOW_WAN_SSH="$2"; shift 2
+            else
+                echo "error: --allow-wan-ssh requires 'yes' or 'no'" >&2; exit 1
+            fi ;;
         -h|--help)
             sed -n '/^# bootstrap/,/^[^#]/p' "$0" | grep '^#' | sed 's/^# \?//'
             exit 0 ;;
@@ -139,6 +149,7 @@ INSTALL_ALL_ARGS=("--nvme-device" "${NVME_DEVICE}")
 [[ "${SKIP_STORAGE}" == true ]]  && INSTALL_ALL_ARGS+=("--skip-storage")
 [[ "${SKIP_FIREWALL}" == true ]] && INSTALL_ALL_ARGS+=("--skip-firewall")
 [[ "${SKIP_SERVICES}" == true ]] && INSTALL_ALL_ARGS+=("--skip-services")
+INSTALL_ALL_ARGS+=("--allow-wan-ssh=${ALLOW_WAN_SSH}")
 
 bash "${SCRIPT_DIR}/install-all.sh" "${INSTALL_ALL_ARGS[@]}"
 

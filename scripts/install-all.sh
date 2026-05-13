@@ -5,10 +5,11 @@
 # Safe to re-run at any time — all steps are idempotent.
 #
 # Usage:
-#   sudo scripts/install-all.sh [--nvme-device DEV]
+#   sudo scripts/install-all.sh [--nvme-device DEV] [--allow-wan-ssh=yes|no]
 #
 # Options:
-#   --nvme-device DEV   NVMe block device to use (default: /dev/nvme0n1)
+#   --nvme-device DEV        NVMe block device to use (default: /dev/nvme0n1)
+#   --allow-wan-ssh=yes|no   Open SSH on WAN zone with fail2ban (default: no)
 #
 # This script does NOT touch:
 #   - Host OS packages (dnf)        → run scripts/bootstrap.sh for first-time setup
@@ -30,14 +31,23 @@ SKIP_STORAGE=false
 SKIP_FIREWALL=false
 SKIP_AP=false
 SKIP_SERVICES=false
+ALLOW_WAN_SSH=no
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --nvme-device)   NVME_DEVICE="$2"; shift 2 ;;
-        --skip-storage)  SKIP_STORAGE=true; shift ;;
-        --skip-firewall) SKIP_FIREWALL=true; shift ;;
-        --skip-ap)       SKIP_AP=true; shift ;;
-        --skip-services) SKIP_SERVICES=true; shift ;;
+        --nvme-device)       NVME_DEVICE="$2"; shift 2 ;;
+        --skip-storage)      SKIP_STORAGE=true; shift ;;
+        --skip-firewall)     SKIP_FIREWALL=true; shift ;;
+        --skip-ap)           SKIP_AP=true; shift ;;
+        --skip-services)     SKIP_SERVICES=true; shift ;;
+        --allow-wan-ssh=yes) ALLOW_WAN_SSH=yes; shift ;;
+        --allow-wan-ssh=no)  ALLOW_WAN_SSH=no;  shift ;;
+        --allow-wan-ssh)
+            if [[ "${2:-}" == "yes" || "${2:-}" == "no" ]]; then
+                ALLOW_WAN_SSH="$2"; shift 2
+            else
+                echo "error: --allow-wan-ssh requires 'yes' or 'no'" >&2; exit 1
+            fi ;;
         -h|--help)
             sed -n '/^# install-all/,/^[^#]/p' "$0" | grep '^#' | sed 's/^# \?//'
             exit 0 ;;
@@ -67,7 +77,7 @@ section "2/5  Firewall"
 if [[ "${SKIP_FIREWALL}" == true ]]; then
     echo "  skipping (--skip-firewall)"
 else
-    bash "${SCRIPT_DIR}/install-firewall.sh"
+    bash "${SCRIPT_DIR}/install-firewall.sh" "--allow-wan-ssh=${ALLOW_WAN_SSH}"
 fi
 
 # ── 3. WiFi access point ──────────────────────────────────────────────────────
