@@ -19,10 +19,6 @@ PublishPort=3002:3000
 #   docker.yaml     — (not used here — we use direct service URLs)
 Volume=/srv/seabird/homepage:/app/config:Z
 
-# Allow Homepage to read container labels for auto-discovery (optional)
-# Requires podman.sock to be accessible
-Volume=/run/podman/podman.sock:/var/run/docker.sock:ro
-
 [Service]
 Restart=on-failure
 RestartSec=10s
