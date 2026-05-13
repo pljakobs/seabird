@@ -84,6 +84,22 @@ section "4/4  Starting services"
 # Reload to pick up any newly installed quadlets / systemd units
 systemctl daemon-reload
 
+# Quadlet generator writes to /run/systemd/generator/ — check it produced output
+GEN_DIR="/run/systemd/generator"
+QUADLET_UNITS=$(ls "${GEN_DIR}"/*.service "${GEN_DIR}"/*.pod 2>/dev/null | \
+    grep -E "caddy|signalk|influxdb|grafana|nextcloud|homepage" || true)
+
+if [[ -z "${QUADLET_UNITS}" ]]; then
+    echo "  WARNING: quadlet generator produced no units — running generator manually to capture errors:"
+    mkdir -p /tmp/quadlet-gen-test
+    /usr/lib/systemd/system-generators/podman-system-generator \
+        /tmp/quadlet-gen-test /tmp/quadlet-gen-test /tmp/quadlet-gen-test 2>&1 || true
+    echo "  Generator test output in /tmp/quadlet-gen-test/:"
+    ls /tmp/quadlet-gen-test/ 2>/dev/null || echo "    (empty)"
+    echo "  Also check: journalctl -b | grep -i quadlet"
+    echo
+fi
+
 SERVICES=(
     caddy
     influxdb
