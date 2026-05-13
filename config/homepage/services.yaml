@@ -12,7 +12,7 @@
         icon: grafana.png
         widget:
           type: grafana
-          url: http://localhost:3001
+          url: http://seabird.local:3001
 
 - Data:
     - InfluxDB:
@@ -25,6 +25,10 @@
         icon: nextcloud.png
 
 - System:
+    - Caddy:
+        href: http://seabird.local
+        description: Landing page & reverse proxy
+        icon: caddy.png
     - Cockpit:
         href: http://seabird.local:9090
         description: System admin
