@@ -131,42 +131,16 @@ else
     info "Skipping hostname configuration (--no-hostname)"
 fi
 
-# ── 4. Storage ────────────────────────────────────────────────────────────────
+# ── 4–7. Storage, firewall, services, start ──────────────────────────────────
 
-section "4/7  Storage (NVMe btrfs layout)"
+section "4/4  Install and start all services"
 
-if [[ "${SKIP_STORAGE}" == true ]]; then
-    info "Skipping storage setup (--skip-storage)"
-else
-    bash "${SCRIPT_DIR}/install-storage.sh" "${NVME_DEVICE}"
-fi
+INSTALL_ALL_ARGS=("--nvme-device" "${NVME_DEVICE}")
+[[ "${SKIP_STORAGE}" == true ]]  && INSTALL_ALL_ARGS+=("--skip-storage")
+[[ "${SKIP_FIREWALL}" == true ]] && INSTALL_ALL_ARGS+=("--skip-firewall")
+[[ "${SKIP_SERVICES}" == true ]] && INSTALL_ALL_ARGS+=("--skip-services")
 
-# ── 5. Firewall ───────────────────────────────────────────────────────────────
-
-section "5/7  Firewall (firewalld zones + Caddy)"
-
-if [[ "${SKIP_FIREWALL}" == true ]]; then
-    info "Skipping firewall setup (--skip-firewall)"
-else
-    bash "${SCRIPT_DIR}/install-firewall.sh"
-fi
-
-# ── 6. Services ───────────────────────────────────────────────────────────────
-
-section "6/7  Services (Podman quadlets)"
-
-if [[ "${SKIP_SERVICES}" == true ]]; then
-    info "Skipping service setup (--skip-services)"
-else
-    bash "${SCRIPT_DIR}/install-services.sh"
-fi
-
-# ── 7. Podman auto-update timer ───────────────────────────────────────────────
-
-section "7/7  Enabling podman-auto-update.timer"
-
-systemctl enable --now podman-auto-update.timer
-ok "podman-auto-update.timer enabled"
+bash "${SCRIPT_DIR}/install-all.sh" "${INSTALL_ALL_ARGS[@]}"
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 
