@@ -1,0 +1,14 @@
+[Unit]
+Description=NVMe podman volume storage
+DefaultDependencies=no
+After=var-lib-containers.mount
+Requires=var-lib-containers.mount
+
+[Mount]
+What=LABEL=seabird-data
+Where=/var/lib/containers/volumes
+Type=btrfs
+Options=noatime,compress=zstd:1,space_cache=v2,subvol=@containers-vol
+
+[Install]
+WantedBy=seabird-mounts.target

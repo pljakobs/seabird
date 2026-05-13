@@ -47,6 +47,27 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+# ── check if already configured ──────────────────────────────────────────────
+
+if nmcli con show "${NM_CONN}" &>/dev/null; then
+    EXISTING_SSID=$(nmcli -g 802-11-wireless.ssid con show "${NM_CONN}" 2>/dev/null || true)
+    EXISTING_IP=$(nmcli -g ipv4.addresses con show "${NM_CONN}" 2>/dev/null || true)
+    echo "AP '${NM_CONN}' is already configured:"
+    echo "  SSID : ${EXISTING_SSID}"
+    echo "  IP   : ${EXISTING_IP}"
+    echo
+    # If all values were supplied non-interactively via args, skip prompt and reconfigure
+    if [[ -n "${SSID}" && -n "${PASSWORD}" && -n "${AP_IP}" ]]; then
+        echo "All parameters provided — reconfiguring."
+    else
+        read -r -p "Reconfigure? [y/N]: " RECONFIGURE
+        if [[ ! "${RECONFIGURE}" =~ ^[Yy]$ ]]; then
+            echo "Leaving AP configuration unchanged."
+            exit 0
+        fi
+    fi
+fi
+
 # ── interactive prompts for anything not supplied on command line ─────────────
 
 if [[ -z "${SSID}" ]]; then

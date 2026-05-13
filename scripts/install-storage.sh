@@ -27,6 +27,7 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEVICE="${1:-/dev/nvme0n1}"
 MOUNT_OPTS="noatime,compress=zstd:1,space_cache=v2"
 LABEL="seabird-data"
@@ -101,11 +102,6 @@ done
 
 umount "${TMPDIR_MOUNT}"
 
-# ── get UUID for fstab ────────────────────────────────────────────────────────
-
-UUID=$(blkid -o value -s UUID "${DEVICE}")
-echo "NVMe UUID: ${UUID}"
-
 # ── create mount points ───────────────────────────────────────────────────────
 
 echo "Creating mount points..."
@@ -116,32 +112,33 @@ for sv in "${!SUBVOLS[@]}"; do
     echo "  ${mp}"
 done
 
-# ── add fstab entries (idempotent) ────────────────────────────────────────────
+# ── install systemd mount units ───────────────────────────────────────────────
 
-echo "Updating /etc/fstab..."
-FSTAB_MARKER="# seabird-nvme"
+echo "Installing systemd mount units..."
+UNIT_SRC="${SCRIPT_DIR}/../config/systemd"
 
-# Remove any previous seabird-nvme entries for clean re-run
-sed -i "/${FSTAB_MARKER}/d" /etc/fstab
+for unit in \
+    seabird-mounts.target \
+    var-log-journal.mount \
+    var-lib-containers.mount \
+    var-lib-containers-volumes.mount \
+    srv-seabird-signalk.mount \
+    srv-seabird-influxdb.mount \
+    srv-seabird-grafana.mount \
+    srv-seabird-nextcloud.mount \
+    srv-seabird-backup.mount; do
+    install -m 0644 "${UNIT_SRC}/${unit}" "/etc/systemd/system/${unit}"
+    echo "  /etc/systemd/system/${unit}"
+done
 
-{
-    echo ""
-    echo "${FSTAB_MARKER} — managed by install-storage.sh, do not edit manually"
-    for sv in "${!SUBVOLS[@]}"; do
-        mp="${SUBVOLS[$sv]}"
-        [[ -z "${mp}" ]] && continue
-        printf 'UUID=%-40s %-35s btrfs %s,subvol=%-22s 0 0\n' \
-            "${UUID}" "${mp}" "${MOUNT_OPTS}" "${sv}"
-    done
-} >> /etc/fstab
+# Remove old seabird-nvme fstab entries if present from a previous install
+if grep -q "seabird-nvme" /etc/fstab 2>/dev/null; then
+    echo "Removing legacy seabird-nvme fstab entries..."
+    sed -i "/seabird-nvme/d" /etc/fstab
+fi
 
-echo "fstab updated."
-
-# ── mount all new entries ─────────────────────────────────────────────────────
-
-echo "Mounting all seabird NVMe subvolumes..."
 systemctl daemon-reload
-mount --all --fstab /etc/fstab -t btrfs 2>/dev/null || true
+systemctl enable --now seabird-mounts.target
 
 # Verify
 echo ""
@@ -152,7 +149,6 @@ findmnt -t btrfs --output TARGET,SOURCE,OPTIONS
 
 echo ""
 echo "Configuring journald to use NVMe..."
-mkdir -p /var/log/journal
 chown root:systemd-journal /var/log/journal
 chmod 2755 /var/log/journal
 
@@ -168,26 +164,5 @@ EOF
 systemctl restart systemd-journald
 echo "journald configured."
 
-# ── configure podman volumes to use NVMe ──────────────────────────────────────
-
-echo ""
-echo "Configuring podman volume storage on NVMe..."
-mkdir -p /etc/containers
-# volumes dir already bind-mounted via fstab — ensure containers config points there
-if ! grep -q 'volume_path' /etc/containers/storage.conf 2>/dev/null; then
-    # Patch or create storage.conf
-    if [[ -f /etc/containers/storage.conf ]]; then
-        # Append override if not present
-        cat >> /etc/containers/storage.conf <<'EOF'
-
-# seabird: store volumes on NVMe btrfs
-[storage.options]
-  mount_program = "/usr/bin/fuse-overlayfs"
-
-EOF
-    fi
-fi
-echo "Podman volumes will be stored in /var/lib/containers/volumes (NVMe)."
-echo "Container images remain on eMMC (/var/lib/containers)."
 echo ""
 echo "Storage setup complete."

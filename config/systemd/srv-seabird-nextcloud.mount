@@ -1,0 +1,13 @@
+[Unit]
+Description=NVMe Nextcloud data
+DefaultDependencies=no
+After=blockdev@dev-disk-by\x2dlabel-seabird\x2ddata.target
+
+[Mount]
+What=LABEL=seabird-data
+Where=/srv/seabird/nextcloud
+Type=btrfs
+Options=noatime,compress=zstd:1,space_cache=v2,subvol=@data-nextcloud
+
+[Install]
+WantedBy=seabird-mounts.target

@@ -1,0 +1,7 @@
+[Unit]
+Description=All seabird NVMe mounts
+Documentation=https://github.com/pljakobs/seabird
+After=blockdev@dev-disk-by\x2dlabel-seabird\x2ddata.target
+
+[Install]
+WantedBy=local-fs.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=NVMe Grafana data
+DefaultDependencies=no
+After=blockdev@dev-disk-by\x2dlabel-seabird\x2ddata.target
+
+[Mount]
+What=LABEL=seabird-data
+Where=/srv/seabird/grafana
+Type=btrfs
+Options=noatime,compress=zstd:1,space_cache=v2,subvol=@data-grafana
+
+[Install]
+WantedBy=seabird-mounts.target

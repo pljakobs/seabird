@@ -1,0 +1,13 @@
+[Unit]
+Description=NVMe podman container storage
+DefaultDependencies=no
+After=blockdev@dev-disk-by\x2dlabel-seabird\x2ddata.target
+
+[Mount]
+What=LABEL=seabird-data
+Where=/var/lib/containers
+Type=btrfs
+Options=noatime,compress=zstd:1,space_cache=v2,subvol=@containers-storage
+
+[Install]
+WantedBy=seabird-mounts.target
