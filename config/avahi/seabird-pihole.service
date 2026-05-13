@@ -1,0 +1,11 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name>Pi-hole</name>
+  <service>
+    <type>_http._tcp</type>
+    <port>3003</port>
+    <txt-record>path=/admin</txt-record>
+    <txt-record>description=DNS and ad blocking</txt-record>
+  </service>
+</service-group>

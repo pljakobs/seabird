@@ -1,0 +1,11 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name>InfluxDB</name>
+  <service>
+    <type>_http._tcp</type>
+    <port>8086</port>
+    <txt-record>path=/</txt-record>
+    <txt-record>description=Time-series database</txt-record>
+  </service>
+</service-group>

@@ -1,0 +1,17 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name>Navidrome</name>
+  <service>
+    <type>_http._tcp</type>
+    <port>4533</port>
+    <txt-record>path=/</txt-record>
+    <txt-record>description=Music streaming</txt-record>
+  </service>
+  <!-- Subsonic API — discovered by mobile clients (DSub, Symfonium, etc.) -->
+  <service>
+    <type>_subsonic._tcp</type>
+    <port>4533</port>
+    <txt-record>path=/rest</txt-record>
+  </service>
+</service-group>

@@ -127,6 +127,29 @@ EOF
 systemctl restart systemd-resolved
 echo "  resolved stub listener disabled"
 
+# ── avahi mDNS service advertisements ───────────────────────────────────────
+
+echo "Installing avahi service advertisements..."
+AVAHI_SRC="${SCRIPT_DIR}/../config/avahi"
+mkdir -p /etc/avahi/services
+for f in "${AVAHI_SRC}"/*.service; do
+    install -m 0644 "${f}" "/etc/avahi/services/$(basename "${f}")"
+    echo "  /etc/avahi/services/$(basename "${f}")"
+done
+
+# Enable avahi-daemon so seabird.local resolves on the LAN
+if ! systemctl is-enabled avahi-daemon &>/dev/null; then
+    systemctl enable avahi-daemon
+fi
+systemctl restart avahi-daemon
+echo "  avahi-daemon enabled and running"
+
+# Enable mdns4_minimal in nsswitch so *.local resolves via avahi
+if ! grep -q "mdns4_minimal" /etc/nsswitch.conf; then
+    sed -i 's/^hosts:.*/hosts:      files mdns4_minimal [NOTFOUND=return] dns myhostname/' /etc/nsswitch.conf
+    echo "  nsswitch.conf: mdns4_minimal enabled"
+fi
+
 # ── install systemd template units + seabird-services.target ─────────────────
 
 echo "Installing systemd units..."

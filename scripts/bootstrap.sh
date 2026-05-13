@@ -102,6 +102,9 @@ DNF_PACKAGES=(
     # Misc tools
     git
     jq
+    # mDNS / service discovery
+    avahi
+    nss-mdns
 )
 
 info "Running dnf install (this may take a minute)..."

@@ -1,0 +1,21 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name>Signal-K</name>
+  <service>
+    <type>_http._tcp</type>
+    <port>3000</port>
+    <txt-record>path=/</txt-record>
+    <txt-record>description=Marine data hub</txt-record>
+  </service>
+  <service>
+    <type>_signalk-http._tcp</type>
+    <port>3000</port>
+    <txt-record>path=/signalk</txt-record>
+  </service>
+  <service>
+    <type>_signalk-ws._tcp</type>
+    <port>3000</port>
+    <txt-record>path=/signalk/v1/stream</txt-record>
+  </service>
+</service-group>
