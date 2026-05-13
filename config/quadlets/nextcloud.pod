@@ -1,10 +1,11 @@
-PodName=nextcloud
-PublishPort=8080:80
-
 [Unit]
 Description=Nextcloud pod
 After=network-online.target
 Wants=network-online.target
+
+[Pod]
+PodName=nextcloud
+PublishPort=8080:80
 
 [Install]
 WantedBy=default.target
