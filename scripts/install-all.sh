@@ -110,7 +110,7 @@ systemctl daemon-reload
 # Quadlet generator writes to /run/systemd/generator/ — check it produced output
 GEN_DIR="/run/systemd/generator"
 QUADLET_UNITS=$(ls "${GEN_DIR}"/*.service "${GEN_DIR}"/*.pod 2>/dev/null | \
-    grep -E "caddy|signalk|influxdb|grafana|nextcloud|homepage" || true)
+    grep -E "caddy|signalk|influxdb|grafana|nextcloud|homepage|pihole" || true)
 
 if [[ -z "${QUADLET_UNITS}" ]]; then
     echo "  WARNING: quadlet generator produced no units — running generator manually to capture errors:"
@@ -130,6 +130,7 @@ SERVICES=(
     grafana
     nextcloud-pod
     homepage
+    pihole
 )
 
 for svc in "${SERVICES[@]}"; do

@@ -1,5 +1,6 @@
 [Unit]
 Description=InfluxDB time-series database
+PartOf=seabird-services.target
 Documentation=https://docs.influxdata.com
 After=network-online.target
 Wants=network-online.target
@@ -28,4 +29,4 @@ Restart=on-failure
 RestartSec=10s
 
 [Install]
-WantedBy=multi-user.target default.target
+WantedBy=seabird-services.target default.target

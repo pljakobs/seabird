@@ -1,5 +1,6 @@
 [Unit]
 Description=Pi-hole DNS & ad blocker
+PartOf=seabird-services.target
 Documentation=https://pi-hole.net
 # Pi-hole must be up before services that rely on DNS resolution
 After=network-online.target
@@ -35,4 +36,4 @@ Restart=on-failure
 RestartSec=15s
 
 [Install]
-WantedBy=multi-user.target default.target
+WantedBy=seabird-services.target default.target

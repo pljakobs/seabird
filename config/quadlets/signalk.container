@@ -1,5 +1,6 @@
 [Unit]
 Description=Signal-K marine data server
+PartOf=seabird-services.target
 Documentation=https://signalk.org
 After=network-online.target
 Wants=network-online.target
@@ -24,4 +25,4 @@ Restart=on-failure
 RestartSec=10s
 
 [Install]
-WantedBy=multi-user.target default.target
+WantedBy=seabird-services.target default.target

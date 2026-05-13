@@ -125,11 +125,11 @@ EOF
 systemctl restart systemd-resolved
 echo "  resolved stub listener disabled"
 
-# ── install systemd template units ───────────────────────────────────────────
+# ── install systemd template units + seabird-services.target ─────────────────
 
-echo "Installing systemd template units..."
+echo "Installing systemd units..."
 SYSTEMD_SRC="${SCRIPT_DIR}/../config/systemd"
-for unit in seabird-nc-scan@.service seabird-nc-scan@.timer; do
+for unit in seabird-nc-scan@.service seabird-nc-scan@.timer seabird-services.target; do
     install -m 0644 "${SYSTEMD_SRC}/${unit}" "/etc/systemd/system/${unit}"
     echo "  /etc/systemd/system/${unit}"
 done
@@ -141,17 +141,14 @@ echo "Reloading systemd (quadlet generator)..."
 systemctl daemon-reload
 
 echo ""
-echo "Services installed. Start them with:"
-echo "  systemctl start caddy.service"
-echo "  systemctl start pihole.service"
-echo "  systemctl start signalk.service"
-echo "  systemctl start influxdb.service"
-echo "  systemctl start grafana.service"
-echo "  systemctl start nextcloud-pod.service"
-echo "  systemctl start homepage.service"
+echo "Services installed."
+echo "Start/stop/restart all services:"
+echo "  systemctl start   seabird-services.target"
+echo "  systemctl stop    seabird-services.target"
+echo "  systemctl restart seabird-services.target"
 echo ""
-echo "Enable on boot with:"
-echo "  systemctl enable caddy signalk influxdb grafana nextcloud-pod homepage pihole"
+echo "Or individually:"
+echo "  systemctl start caddy influxdb signalk grafana nextcloud-pod homepage pihole"
 echo ""
 echo "Add crew users with:"
 echo "  scripts/add-user.sh <username>"

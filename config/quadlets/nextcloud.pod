@@ -1,5 +1,6 @@
 [Unit]
 Description=Nextcloud pod
+PartOf=seabird-services.target
 After=network-online.target
 Wants=network-online.target
 
@@ -8,4 +9,4 @@ PodName=nextcloud
 PublishPort=8080:80
 
 [Install]
-WantedBy=default.target
+WantedBy=seabird-services.target default.target

@@ -1,0 +1,8 @@
+[Unit]
+Description=All Seabird application services
+Documentation=https://github.com/pljakobs/seabird
+After=seabird-mounts.target network-online.target
+Wants=network-online.target
+
+[Install]
+WantedBy=multi-user.target default.target

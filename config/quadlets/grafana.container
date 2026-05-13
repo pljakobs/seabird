@@ -1,5 +1,6 @@
 [Unit]
-Description=Grafana visualization
+Description=Grafana
+PartOf=seabird-services.target visualization
 Documentation=https://grafana.com/docs
 After=network-online.target influxdb.service
 Wants=network-online.target
@@ -28,4 +29,4 @@ Restart=on-failure
 RestartSec=10s
 
 [Install]
-WantedBy=multi-user.target default.target
+WantedBy=seabird-services.target default.target
