@@ -49,6 +49,8 @@ dirs=(
     /srv/seabird/homepage
     /srv/seabird/pihole/etc-pihole
     /srv/seabird/pihole/etc-dnsmasq.d
+    /srv/seabird/navidrome
+    /srv/seabird/music
     /srv/seabird/backup
 )
 for d in "${dirs[@]}"; do
@@ -148,7 +150,7 @@ echo "  systemctl stop    seabird-services.target"
 echo "  systemctl restart seabird-services.target"
 echo ""
 echo "Or individually:"
-echo "  systemctl start caddy influxdb signalk grafana nextcloud-pod homepage pihole"
+echo "  systemctl start caddy influxdb signalk grafana nextcloud-pod homepage pihole navidrome"
 echo ""
 echo "Add crew users with:"
 echo "  scripts/add-user.sh <username>"

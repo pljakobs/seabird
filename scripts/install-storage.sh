@@ -13,6 +13,8 @@
 #   @data-grafana     /srv/seabird/grafana             Grafana data
 #   @data-nextcloud   /srv/seabird/nextcloud           Nextcloud data
 #   @data-pihole      /srv/seabird/pihole              Pi-hole DNS data
+#   @data-navidrome   /srv/seabird/navidrome           Navidrome state & database
+#   @music            /srv/seabird/music               Music collection
 #   @backup           /srv/seabird/backup              local backups / staging
 #   @snapshots        (not mounted — snapper target)   btrfs snapshots
 #
@@ -49,6 +51,8 @@ declare -A SUBVOLS=(
     [@data-grafana]="/srv/seabird/grafana"
     [@data-nextcloud]="/srv/seabird/nextcloud"
     [@data-pihole]="/srv/seabird/pihole"
+    [@data-navidrome]="/srv/seabird/navidrome"
+    [@music]="/srv/seabird/music"
     [@backup]="/srv/seabird/backup"
     [@snapshots]=""    # not mounted; used by snapper
 )
@@ -135,7 +139,9 @@ for unit in \
     srv-seabird-grafana.mount \
     srv-seabird-nextcloud.mount \
     srv-seabird-backup.mount \
-    srv-seabird-pihole.mount; do
+    srv-seabird-pihole.mount \
+    srv-seabird-navidrome.mount \
+    srv-seabird-music.mount; do
     install -m 0644 "${UNIT_SRC}/${unit}" "/etc/systemd/system/${unit}"
     echo "  /etc/systemd/system/${unit}"
 done

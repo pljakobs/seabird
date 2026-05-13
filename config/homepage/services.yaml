@@ -13,6 +13,10 @@
         widget:
           type: grafana
           url: http://seabird.local:3001
+    - Navidrome:
+        href: http://seabird.local:4533
+        description: Music streaming
+        icon: navidrome.png
 
 - Data:
     - InfluxDB:

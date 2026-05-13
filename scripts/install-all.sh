@@ -131,6 +131,7 @@ SERVICES=(
     nextcloud-pod
     homepage
     pihole
+    navidrome
 )
 
 for svc in "${SERVICES[@]}"; do

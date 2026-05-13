@@ -44,6 +44,7 @@ a{display:block;padding:.5rem 0;font-size:1.1rem}
 <a href="http://seabird.local:3001">&#128200; Grafana</a>
 <a href="http://seabird.local:8086">&#128200; InfluxDB</a>
 <a href="http://seabird.local:3003/admin">&#128274; Pi-hole DNS</a>
+<a href="http://seabird.local:4533">&#127925; Music (Navidrome)</a>
 <a href="http://seabird.local:9090">&#9881;&#65039; Admin (Cockpit)</a>
 <script>
 // Show portal banner if /run/seabird/captive-portal.json exists (via status API)
