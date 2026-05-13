@@ -1,0 +1,16 @@
+[Unit]
+Description=Nextcloud Redis cache
+After=network-online.target
+
+[Container]
+Image=docker.io/library/redis:7-alpine
+ContainerName=nextcloud-redis
+AutoUpdate=registry
+Pod=nextcloud.pod
+
+[Service]
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target default.target

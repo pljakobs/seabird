@@ -1,0 +1,31 @@
+[Unit]
+Description=Homepage dashboard
+Documentation=https://gethomepage.dev
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=ghcr.io/gethomepage/homepage:latest
+ContainerName=homepage
+AutoUpdate=registry
+
+PublishPort=3002:3000
+
+# Config files — create these in /srv/seabird/homepage/ to customise:
+#   services.yaml   — service tiles
+#   bookmarks.yaml  — bookmark links
+#   widgets.yaml    — top-bar widgets (weather, search, etc.)
+#   settings.yaml   — general settings
+#   docker.yaml     — (not used here — we use direct service URLs)
+Volume=/srv/seabird/homepage:/app/config:Z
+
+# Allow Homepage to read container labels for auto-discovery (optional)
+# Requires podman.sock to be accessible
+Volume=/run/podman/podman.sock:/var/run/docker.sock:ro
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target default.target

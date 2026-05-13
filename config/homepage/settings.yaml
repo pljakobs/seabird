@@ -1,0 +1,17 @@
+# Homepage settings — /srv/seabird/homepage/settings.yaml
+title: Seabird
+background: https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=1920&q=80
+backgroundBlur: sm
+theme: dark
+color: slate
+headerStyle: clean
+layout:
+  Marine:
+    style: row
+    columns: 2
+  Data:
+    style: row
+    columns: 2
+  System:
+    style: row
+    columns: 2

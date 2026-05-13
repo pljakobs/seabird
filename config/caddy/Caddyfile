@@ -1,0 +1,58 @@
+# seabird Caddyfile
+# Serves the boat router management interface on the LAN.
+# Dynamic snippets (e.g. captive portal proxy) are dropped into conf.d/
+# and picked up via the import directive below.
+
+{
+    admin off
+}
+
+# Landing page — links to management services
+http://seabird.local {
+    handle /api/portal-status {
+        # Serve captive-portal.json if present; 404 otherwise.
+        # /run/seabird is bind-mounted into the container.
+        root * /run/seabird
+        try_files /captive-portal.json
+        file_server
+    }
+
+    handle /portal/* {
+        # Placeholder — overridden by conf.d/portal.caddy when a captive
+        # portal is active. Returns 503 otherwise so crew gets a clear message.
+        respond "No captive portal active." 503
+    }
+
+    handle {
+        respond `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Seabird</title>
+<style>
+body{font-family:sans-serif;max-width:600px;margin:4rem auto;padding:0 1rem}
+a{display:block;padding:.5rem 0;font-size:1.1rem}
+.portal-banner{background:#fffbe6;border:1px solid #f0c040;border-radius:6px;
+  padding:1rem;margin-bottom:1.5rem;display:none}
+</style>
+</head>
+<body>
+<h1>Seabird</h1>
+<div class="portal-banner" id="portal-banner">
+  &#9888; Marina WiFi requires login &mdash;
+  <a href="/portal/">Authenticate now</a>
+</div>
+<a href="http://seabird.local:3000">&#127908; Signal-K</a>
+<a href="http://seabird.local:3001">&#128200; Grafana</a>
+<a href="http://seabird.local:8086">&#128200; InfluxDB</a>
+<a href="http://seabird.local:9090">&#9881;&#65039; Admin (Cockpit)</a>
+<script>
+// Show portal banner if /run/seabird/captive-portal.json exists (via status API)
+fetch('/api/portal-status').then(r=>r.ok&&r.json()).then(d=>{
+  if(d&&d.state==='portal')document.getElementById('portal-banner').style.display='block';
+}).catch(()=>{});
+</script>
+</body></html>` 200
+    }
+}
+
+# Import dynamic snippets (captive portal proxy, etc.)
+import /etc/caddy/conf.d/*.caddy

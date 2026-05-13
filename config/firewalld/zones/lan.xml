@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  lan zone — crew network interfaces
+    wlp6s0  Intel PCIe WiFi running as access point
+    enp4s0  PCIe Realtek GbE wired crew LAN
+
+  Policy: ACCEPT inbound from local clients. Services explicitly listed.
+  Interface assignment is done at install time via firewall-cmd.
+-->
+<zone target="ACCEPT">
+  <short>lan</short>
+  <description>Crew LAN interfaces. Allow DNS, DHCP, mDNS, SSH from local clients.</description>
+  <service name="ssh"/>
+  <service name="dns"/>
+  <service name="dhcp"/>
+  <service name="dhcpv6"/>
+  <service name="mdns"/>
+</zone>

@@ -1,0 +1,31 @@
+[Unit]
+Description=Grafana visualization
+Documentation=https://grafana.com/docs
+After=network-online.target influxdb.service
+Wants=network-online.target
+
+[Container]
+Image=docker.io/grafana/grafana-oss:latest
+ContainerName=grafana
+AutoUpdate=registry
+
+PublishPort=3001:3000
+
+Volume=/srv/seabird/grafana:/var/lib/grafana:Z
+
+# Run as root inside container so it can write to the Z-labeled volume
+# (Grafana image defaults to uid 472 — override for simplicity on this appliance)
+User=root
+
+Environment=GF_SERVER_ROOT_URL=http://seabird.local:3001
+Environment=GF_AUTH_ANONYMOUS_ENABLED=true
+Environment=GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+Environment=GF_SECURITY_ALLOW_EMBEDDING=true
+EnvironmentFile=-/etc/seabird/grafana.env
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target default.target

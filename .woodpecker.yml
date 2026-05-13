@@ -1,0 +1,12 @@
+steps:
+  - name: build
+    image: quay.io/podman/stable:latest
+    commands:
+      - chmod +x scripts/build-image.sh scripts/validate-image.sh
+      - IMAGE_REGISTRY=registry.fritz.box IMAGE_REPOSITORY=seabird/bootc IMAGE_TAG=dev CHANNEL=dev ./scripts/build-image.sh
+
+  - name: validate
+    image: quay.io/podman/stable:latest
+    commands:
+      - chmod +x scripts/build-image.sh scripts/validate-image.sh
+      - IMAGE_REGISTRY=registry.fritz.box IMAGE_REPOSITORY=seabird/bootc IMAGE_TAG=dev ./scripts/validate-image.sh

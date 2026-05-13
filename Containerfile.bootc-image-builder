@@ -1,0 +1,5 @@
+FROM quay.io/centos-bootc/bootc-image-builder:latest
+
+# Required for --in-vm when building arm64 raw images.
+RUN dnf -y install qemu-system-aarch64 \
+    && dnf clean all

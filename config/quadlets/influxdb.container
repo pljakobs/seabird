@@ -1,0 +1,31 @@
+[Unit]
+Description=InfluxDB time-series database
+Documentation=https://docs.influxdata.com
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=docker.io/influxdb:2-alpine
+ContainerName=influxdb
+AutoUpdate=registry
+
+PublishPort=8086:8086
+
+# Persistent data and config on NVMe btrfs
+Volume=/srv/seabird/influxdb/data:/var/lib/influxdb2:Z
+Volume=/srv/seabird/influxdb/config:/etc/influxdb2:Z
+
+# Initial setup — only used on first start when no config exists.
+# Change password via CLI or UI after first boot.
+Environment=DOCKER_INFLUXDB_INIT_MODE=setup
+Environment=DOCKER_INFLUXDB_INIT_USERNAME=admin
+Environment=DOCKER_INFLUXDB_INIT_ORG=seabird
+Environment=DOCKER_INFLUXDB_INIT_BUCKET=signalk
+EnvironmentFile=-/etc/seabird/influxdb.env
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target default.target

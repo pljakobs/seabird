@@ -1,0 +1,94 @@
+FROM quay.io/fedora/fedora-bootc:latest AS seabird-base
+
+ARG TARGETARCH
+
+# Shared core for this standalone seabird OS.
+RUN dnf -y install \
+    curl \
+    jq \
+    openssl \
+    openssh-server \
+    sudo \
+    shadow-utils \
+    podman \
+    netavark \
+    aardvark-dns \
+    systemd-resolved \
+    bash-completion \
+    && dnf clean all
+
+# bootc-image-builder requires an explicit default root filesystem type when
+# the base image does not provide one.
+RUN mkdir -p /usr/lib/bootc/install \
+    && printf '[install.filesystem]\nroot.type = "ext4"\n' \
+      > /usr/lib/bootc/install/00-defaults.toml
+
+# Keep a persistent journal and enable the base networking/services that are
+# common to both router and workstation-style images.
+RUN mkdir -p /etc/systemd/journald.conf.d /var/log/journal \
+    && printf '%s\n' '[Journal]' 'Storage=persistent' 'SystemMaxUse=200M' > /etc/systemd/journald.conf.d/90-persistent.conf \
+    && chown root:systemd-journal /var/log/journal \
+    && chmod 2755 /var/log/journal \
+    && systemctl enable podman-auto-update.timer \
+    && systemctl enable podman.socket \
+    && systemctl enable nftables \
+    && systemctl enable systemd-resolved \
+    && systemctl mask bootloader-update.service
+
+# Raspberry Pi firmware and bootloader bits for ARM boards.
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        dnf -y install \
+            uboot-images-armv8 \
+            bcm283x-firmware \
+        && dnf clean all; \
+    fi
+
+FROM seabird-base
+
+ARG SSH_PUBKEY
+ARG ADMIN_USERNAME=admin
+ARG FIRSTBOOT_BEACON_URL
+
+# Base tooling required by the plan's hardware bring-up and networking phases.
+RUN dnf -y install \
+    linux-firmware \
+    nftables \
+    wpa_supplicant \
+    iw \
+    ethtool \
+    iproute \
+    NetworkManager \
+    libqmi \
+    libmbim \
+    modem-manager \
+    ModemManager-devel \
+    && dnf clean all
+
+# Create admin account, install SSH key, and enable sshd on boot.
+RUN test -n "${SSH_PUBKEY}" \
+    && useradd -m -G wheel -s /bin/bash "${ADMIN_USERNAME}" \
+    && mkdir -p "/home/${ADMIN_USERNAME}/.ssh" \
+    && printf '%s\n' "${SSH_PUBKEY}" > "/home/${ADMIN_USERNAME}/.ssh/authorized_keys" \
+    && chown -R "${ADMIN_USERNAME}:${ADMIN_USERNAME}" "/home/${ADMIN_USERNAME}/.ssh" \
+    && chmod 0700 "/home/${ADMIN_USERNAME}/.ssh" \
+    && chmod 0600 "/home/${ADMIN_USERNAME}/.ssh/authorized_keys" \
+    && printf '%%wheel ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/90-wheel-nopasswd \
+    && chmod 0440 /etc/sudoers.d/90-wheel-nopasswd \
+    && mkdir -p /etc/ssh/sshd_config.d \
+    && printf '%s\n' 'PasswordAuthentication no' 'PermitRootLogin no' > /etc/ssh/sshd_config.d/90-seabird.conf \
+    && install -d /usr/local/bin /etc/seabird /etc/systemd/system \
+    && printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'BEACON_URL="$(cat /etc/seabird/firstboot-beacon-url 2>/dev/null || true)"' 'if [[ -z "${BEACON_URL}" ]]; then' '  logger -t firstboot-beacon "No beacon URL configured; skipping"' '  exit 0' 'fi' 'HOSTNAME_VALUE="$(hostnamectl --static 2>/dev/null || hostname)"' 'BOOT_ID="$(cat /proc/sys/kernel/random/boot_id)"' 'for attempt in $(seq 1 30); do' '  if curl --silent --show-error --fail --max-time 5 --retry 0 "${BEACON_URL}?hostname=${HOSTNAME_VALUE}&boot_id=${BOOT_ID}&attempt=${attempt}" >/dev/null; then' '    logger -t firstboot-beacon "Beacon delivered to ${BEACON_URL}"' '    exit 0' '  fi' '  sleep 10' 'done' 'logger -t firstboot-beacon "Failed to deliver beacon to ${BEACON_URL}"' 'exit 1' > /usr/local/bin/firstboot-beacon.sh \
+    && chmod 0755 /usr/local/bin/firstboot-beacon.sh \
+    && printf '%s\n' "${FIRSTBOOT_BEACON_URL}" > /etc/seabird/firstboot-beacon-url \
+    && printf '%s\n' '[Unit]' 'Description=Seabird first boot beacon' 'Wants=network-online.target' 'After=network-online.target NetworkManager.service' '' '[Service]' 'Type=oneshot' 'ExecStart=/usr/local/bin/firstboot-beacon.sh' 'RemainAfterExit=yes' '' '[Install]' 'WantedBy=multi-user.target' > /etc/systemd/system/firstboot-beacon.service \
+    && mkdir -p /etc/systemd/system/multi-user.target.wants \
+    && ln -sf /etc/systemd/system/firstboot-beacon.service /etc/systemd/system/multi-user.target.wants/firstboot-beacon.service \
+    && ln -sf /usr/lib/systemd/system/sshd.service /etc/systemd/system/multi-user.target.wants/sshd.service
+
+# Firewall rules — raw nftables (firewalld removed; nftables.service enabled above).
+COPY config/nftables.conf /etc/nftables/seabird.conf
+RUN printf 'include "/etc/nftables/seabird.conf"\n' > /etc/sysconfig/nftables.conf
+
+# Placeholder marker for build validation and traceability.
+LABEL org.opencontainers.image.title="seabird-bootc"
+LABEL org.opencontainers.image.description="Initial local bootstrap image for seabird"

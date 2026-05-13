@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodic Nextcloud file scan for %i
+
+[Timer]
+# Scan one hour after boot, then hourly
+OnBootSec=1h
+OnUnitActiveSec=1h
+# If a scan was missed (e.g. system was down) run it on next boot
+Persistent=true
+
+[Install]
+WantedBy=timers.target

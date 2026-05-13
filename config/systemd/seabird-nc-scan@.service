@@ -1,0 +1,13 @@
+[Unit]
+Description=Nextcloud file scan for %i
+Documentation=https://nextcloud.com/occ
+After=nextcloud.service
+Requires=nextcloud.service
+
+[Service]
+Type=oneshot
+# Run occ as www-data inside the nextcloud container
+ExecStart=podman exec --user www-data nextcloud php occ files:scan \
+    --path %i/files --unscanned
+# Suppress "no changes" output (exit 0 is normal)
+SuccessExitStatus=0

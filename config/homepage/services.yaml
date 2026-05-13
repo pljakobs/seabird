@@ -1,0 +1,31 @@
+# Homepage services config — /srv/seabird/homepage/services.yaml
+# https://gethomepage.dev/configs/services/
+
+- Marine:
+    - Signal-K:
+        href: http://seabird.local:3000
+        description: Marine data hub
+        icon: signalk.png
+    - Grafana:
+        href: http://seabird.local:3001
+        description: Charts & dashboards
+        icon: grafana.png
+        widget:
+          type: grafana
+          url: http://localhost:3001
+
+- Data:
+    - InfluxDB:
+        href: http://seabird.local:8086
+        description: Time-series database
+        icon: influxdb.png
+    - Nextcloud:
+        href: http://seabird.local:8080
+        description: Files & crew sync
+        icon: nextcloud.png
+
+- System:
+    - Cockpit:
+        href: http://seabird.local:9090
+        description: System admin
+        icon: cockpit.png

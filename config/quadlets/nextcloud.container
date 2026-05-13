@@ -1,0 +1,28 @@
+[Unit]
+Description=Nextcloud application
+After=nextcloud-db.service nextcloud-redis.service
+Requires=nextcloud-db.service
+
+[Container]
+Image=docker.io/library/nextcloud:stable-apache
+ContainerName=nextcloud
+AutoUpdate=registry
+Pod=nextcloud.pod
+
+Volume=/srv/seabird/nextcloud/html:/var/www/html:Z
+Volume=/srv/seabird/nextcloud/data:/var/www/html/data:Z
+
+Environment=POSTGRES_HOST=localhost
+Environment=POSTGRES_DB=nextcloud
+Environment=POSTGRES_USER=nextcloud
+Environment=REDIS_HOST=localhost
+Environment=REDIS_HOST_PORT=6379
+Environment=NEXTCLOUD_TRUSTED_DOMAINS=seabird.local localhost 127.0.0.1
+EnvironmentFile=/etc/seabird/nextcloud.env
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target default.target

@@ -1,0 +1,23 @@
+[Unit]
+Description=Nextcloud background cron jobs
+After=nextcloud.service
+Requires=nextcloud.service
+
+[Container]
+Image=docker.io/library/nextcloud:stable-apache
+ContainerName=nextcloud-cron
+AutoUpdate=registry
+Pod=nextcloud.pod
+Entrypoint=/cron.sh
+
+Volume=/srv/seabird/nextcloud/html:/var/www/html:Z
+Volume=/srv/seabird/nextcloud/data:/var/www/html/data:Z
+
+EnvironmentFile=/etc/seabird/nextcloud.env
+
+[Service]
+Restart=on-failure
+RestartSec=30s
+
+[Install]
+WantedBy=multi-user.target default.target

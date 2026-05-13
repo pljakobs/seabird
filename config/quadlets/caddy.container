@@ -1,0 +1,34 @@
+[Unit]
+Description=Caddy reverse proxy / seabird landing page
+Documentation=https://caddyserver.com/docs
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=docker.io/library/caddy:latest
+ContainerName=caddy
+AutoUpdate=registry
+
+# Host network so Caddy binds directly to the LAN IP on port 80
+# and can initiate connections to captive portals via wlan0
+Network=host
+
+# Main config — deployed by install-firewall.sh
+Volume=/etc/caddy/Caddyfile:/etc/caddy/Caddyfile:ro,Z
+
+# Dynamic snippets — written by NM dispatcher (90-seabird-captive-portal)
+# on the host; Caddy reads them on each reload
+Volume=/etc/caddy/conf.d:/etc/caddy/conf.d:ro,Z
+
+# Portal status JSON — written by NM dispatcher, served at /api/portal-status
+Volume=/run/seabird:/run/seabird:ro,Z
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+# caddy reload picks up config changes without dropping active connections
+ExecReload=podman exec caddy caddy reload --config /etc/caddy/Caddyfile --force
+
+[Install]
+WantedBy=default.target

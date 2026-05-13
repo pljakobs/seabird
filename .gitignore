@@ -1,0 +1,11 @@
+# Build artifacts
+artifacts/
+
+# Secrets — never commit these
+/etc/seabird/
+*.env
+!*.env.example
+
+# Editor
+*.code-workspace
+.vscode/

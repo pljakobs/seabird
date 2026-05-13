@@ -1,0 +1,27 @@
+[Unit]
+Description=Signal-K marine data server
+Documentation=https://signalk.org
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=docker.io/signalk/signalk-server:latest
+ContainerName=signalk
+AutoUpdate=registry
+
+# Publish Signal-K HTTP/WS on port 3000
+PublishPort=3000:3000
+
+# Persistent data — plugin config, vessel data, log files
+Volume=/srv/seabird/signalk:/home/node/.signalk:Z
+
+# Signal-K needs to know the vessel MMSI/name — configure via
+# /srv/seabird/signalk/settings.json on first start or via the web UI
+# at http://seabird.local:3000
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target default.target

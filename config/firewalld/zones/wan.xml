@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wan zone — uplink interfaces (all used opportunistically)
+    wwan0  Foxconn T99W175 5G modem
+    wlan0  CM4 onboard WiFi in client/uplink mode
+    end0   CM4 onboard GbE uplink
+
+  Policy: DROP all unsolicited inbound. Masquerade enables NAT for LAN clients.
+  Interface assignment is done at install time via firewall-cmd so this file
+  intentionally contains no <interface> elements (they are runtime state).
+-->
+<zone target="DROP">
+  <short>wan</short>
+  <description>Uplink/WAN interfaces. Drop unsolicited inbound. Masquerade for LAN NAT.</description>
+  <masquerade/>
+  <!-- Allow ICMP echo for connectivity probing -->
+  <icmp-block-inversion/>
+</zone>
