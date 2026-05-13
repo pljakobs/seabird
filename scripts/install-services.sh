@@ -74,7 +74,28 @@ done
 echo "Creating /etc/seabird env stubs..."
 mkdir -p /etc/seabird
 
-for f in influxdb.env grafana.env nextcloud.env pihole.env; do
+# ── influxdb.env — auto-generate secrets on first install ────────────────────
+
+INFLUXDB_ENV="/etc/seabird/influxdb.env"
+if [[ ! -f "${INFLUXDB_ENV}" ]]; then
+    INFLUXDB_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)"
+    INFLUXDB_TOKEN="$(openssl rand -base64 48 | tr -d '/+=' | head -c 64)"
+    cat > "${INFLUXDB_ENV}" <<EOF
+DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD}
+DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN}
+EOF
+    chmod 0600 "${INFLUXDB_ENV}"
+    echo "  generated /etc/seabird/influxdb.env with random password and token"
+    echo "  !! Save these credentials — they are only shown once !!"
+    echo "    InfluxDB admin password : ${INFLUXDB_PASSWORD}"
+    echo "    InfluxDB admin token    : ${INFLUXDB_TOKEN}"
+else
+    echo "  /etc/seabird/influxdb.env already exists — skipping"
+fi
+
+# ── remaining env stubs (touch-only if missing) ───────────────────────────────
+
+for f in grafana.env nextcloud.env pihole.env; do
     dest="/etc/seabird/${f}"
     if [[ ! -f "${dest}" ]]; then
         touch "${dest}"
@@ -90,16 +111,6 @@ NEXTCLOUD_ADMIN_USER=admin
 NEXTCLOUD_ADMIN_PASSWORD=changeme
 EOF
 
-# influxdb.env needs admin token / password
-cat > /etc/seabird/influxdb.env.example <<'EOF'
-DOCKER_INFLUXDB_INIT_PASSWORD=changeme
-DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=changeme-token
-EOF
-
-echo "  example files written to /etc/seabird/*.env.example"
-echo "  copy and fill in before starting services:"
-echo "    cp /etc/seabird/nextcloud.env.example /etc/seabird/nextcloud.env"
-echo "    cp /etc/seabird/influxdb.env.example  /etc/seabird/influxdb.env"
 echo "  For Pi-hole, set WEBPASSWORD and TZ in /etc/seabird/pihole.env"
 echo "  Example: echo 'WEBPASSWORD=yourpassword' >> /etc/seabird/pihole.env"
 
