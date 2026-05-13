@@ -1,0 +1,38 @@
+[Unit]
+Description=Pi-hole DNS & ad blocker
+Documentation=https://pi-hole.net
+# Pi-hole must be up before services that rely on DNS resolution
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=docker.io/pihole/pihole:latest
+ContainerName=pihole
+AutoUpdate=registry
+
+# Host network required so Pi-hole can bind port 53 on the AP interface
+Network=host
+
+# Config persistence on NVMe
+Volume=/srv/seabird/pihole/etc-pihole:/etc/pihole:Z
+Volume=/srv/seabird/pihole/etc-dnsmasq.d:/etc/dnsmasq.d:Z
+
+# Credentials and timezone from env file
+# WEBPASSWORD  — admin UI password (required)
+# TZ           — e.g. Europe/Berlin
+EnvironmentFile=/etc/seabird/pihole.env
+
+# Web UI on 3003 to avoid clash with Caddy on 80
+Environment=WEB_PORT=3003
+# Listen on all local (non-loopback) interfaces for DNS
+Environment=DNSMASQ_LISTENING=local
+
+# NET_ADMIN required for DNS/DHCP socket operations
+AddCapability=NET_ADMIN
+
+[Service]
+Restart=on-failure
+RestartSec=15s
+
+[Install]
+WantedBy=multi-user.target default.target

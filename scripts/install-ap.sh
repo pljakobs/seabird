@@ -153,11 +153,32 @@ nmcli con modify "${NM_CONN}" \
 # NM shared mode runs dnsmasq; custom range goes in dnsmasq-shared.d/
 
 mkdir -p /etc/NetworkManager/dnsmasq-shared.d
+AP_ADDR="${AP_IP%%/*}"   # strip prefix length, e.g. 192.168.42.1 from 192.168.42.1/24
 cat > "${SEABIRD_AP_CONF}" <<EOF
-# seabird AP DHCP range — managed by install-ap.sh, do not edit manually
+# seabird AP DHCP config — managed by install-ap.sh, do not edit manually
 dhcp-range=${DHCP_START},${DHCP_END},12h
+# Hand out Pi-hole (running on this box) as the DNS server for all DHCP clients
+dhcp-option=6,${AP_ADDR}
 EOF
-echo "  DHCP range configured in ${SEABIRD_AP_CONF}"
+echo "  DHCP range and DNS configured in ${SEABIRD_AP_CONF}"
+
+# ── register seabird.local in Pi-hole custom DNS ──────────────────────────────
+
+PIHOLE_CUSTOM_LIST="/srv/seabird/pihole/etc-pihole/custom.list"
+if [[ -d /srv/seabird/pihole ]]; then
+    mkdir -p /srv/seabird/pihole/etc-pihole
+    # Replace or add seabird entry so re-runs stay idempotent
+    if grep -q "seabird" "${PIHOLE_CUSTOM_LIST}" 2>/dev/null; then
+        sed -i "s/^.* seabird\.local.*$/${AP_ADDR} seabird.local seabird/" "${PIHOLE_CUSTOM_LIST}"
+        echo "  Updated seabird.local DNS entry → ${AP_ADDR}"
+    else
+        echo "${AP_ADDR} seabird.local seabird" >> "${PIHOLE_CUSTOM_LIST}"
+        echo "  Added seabird.local DNS entry → ${AP_ADDR}"
+    fi
+else
+    echo "  Note: /srv/seabird/pihole not mounted yet; run install-services.sh to create dirs,"
+    echo "        then re-run install-ap.sh to write the seabird.local DNS entry."
+fi
 
 # ── bring it up ───────────────────────────────────────────────────────────────
 

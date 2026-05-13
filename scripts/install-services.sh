@@ -47,6 +47,8 @@ dirs=(
     /srv/seabird/nextcloud/data
     /srv/seabird/nextcloud/db
     /srv/seabird/homepage
+    /srv/seabird/pihole/etc-pihole
+    /srv/seabird/pihole/etc-dnsmasq.d
     /srv/seabird/backup
 )
 for d in "${dirs[@]}"; do
@@ -72,7 +74,7 @@ done
 echo "Creating /etc/seabird env stubs..."
 mkdir -p /etc/seabird
 
-for f in influxdb.env grafana.env nextcloud.env; do
+for f in influxdb.env grafana.env nextcloud.env pihole.env; do
     dest="/etc/seabird/${f}"
     if [[ ! -f "${dest}" ]]; then
         touch "${dest}"
@@ -98,6 +100,19 @@ echo "  example files written to /etc/seabird/*.env.example"
 echo "  copy and fill in before starting services:"
 echo "    cp /etc/seabird/nextcloud.env.example /etc/seabird/nextcloud.env"
 echo "    cp /etc/seabird/influxdb.env.example  /etc/seabird/influxdb.env"
+echo "  For Pi-hole, set WEBPASSWORD and TZ in /etc/seabird/pihole.env"
+echo "  Example: echo 'WEBPASSWORD=yourpassword' >> /etc/seabird/pihole.env"
+
+# ── disable systemd-resolved stub listener (Pi-hole needs port 53) ───────────
+
+echo "Disabling systemd-resolved DNS stub listener (Pi-hole needs port 53)..."
+mkdir -p /etc/systemd/resolved.conf.d
+cat > /etc/systemd/resolved.conf.d/90-seabird-no-stub.conf <<'EOF'
+[Resolve]
+DNSStubListener=no
+EOF
+systemctl restart systemd-resolved
+echo "  resolved stub listener disabled"
 
 # ── install systemd template units ───────────────────────────────────────────
 
@@ -117,6 +132,7 @@ systemctl daemon-reload
 echo ""
 echo "Services installed. Start them with:"
 echo "  systemctl start caddy.service"
+echo "  systemctl start pihole.service"
 echo "  systemctl start signalk.service"
 echo "  systemctl start influxdb.service"
 echo "  systemctl start grafana.service"
@@ -124,7 +140,7 @@ echo "  systemctl start nextcloud-pod.service"
 echo "  systemctl start homepage.service"
 echo ""
 echo "Enable on boot with:"
-echo "  systemctl enable caddy signalk influxdb grafana nextcloud-pod homepage"
+echo "  systemctl enable caddy signalk influxdb grafana nextcloud-pod homepage pihole"
 echo ""
 echo "Add crew users with:"
 echo "  scripts/add-user.sh <username>"

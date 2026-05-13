@@ -25,6 +25,10 @@
         icon: nextcloud.png
 
 - System:
+    - Pi-hole:
+        href: http://seabird.local:3003/admin
+        description: DNS & ad blocking
+        icon: pi-hole.png
     - Caddy:
         href: http://seabird.local
         description: Landing page & reverse proxy

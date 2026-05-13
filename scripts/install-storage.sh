@@ -10,6 +10,7 @@
 #   @data-influxdb    /srv/seabird/influxdb            InfluxDB data
 #   @data-grafana     /srv/seabird/grafana             Grafana data
 #   @data-nextcloud   /srv/seabird/nextcloud           Nextcloud data
+#   @data-pihole      /srv/seabird/pihole              Pi-hole DNS data
 #   @backup           /srv/seabird/backup              local backups / staging
 #   @snapshots        (not mounted — snapper target)   btrfs snapshots
 #
@@ -43,6 +44,7 @@ declare -A SUBVOLS=(
     [@data-influxdb]="/srv/seabird/influxdb"
     [@data-grafana]="/srv/seabird/grafana"
     [@data-nextcloud]="/srv/seabird/nextcloud"
+    [@data-pihole]="/srv/seabird/pihole"
     [@backup]="/srv/seabird/backup"
     [@snapshots]=""    # not mounted; used by snapper
 )
@@ -126,7 +128,8 @@ for unit in \
     srv-seabird-influxdb.mount \
     srv-seabird-grafana.mount \
     srv-seabird-nextcloud.mount \
-    srv-seabird-backup.mount; do
+    srv-seabird-backup.mount \
+    srv-seabird-pihole.mount; do
     install -m 0644 "${UNIT_SRC}/${unit}" "/etc/systemd/system/${unit}"
     echo "  /etc/systemd/system/${unit}"
 done
