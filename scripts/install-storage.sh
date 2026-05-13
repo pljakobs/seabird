@@ -5,6 +5,8 @@
 #
 #   Subvolume         Mount point                      Purpose
 #   @journal          /var/log/journal                 systemd-journald
+#   @var-tmp          /var/tmp                         podman extraction scratch + general tmp
+#   @var-cache        /var/cache                       dnf and package caches
 #   @containers-vol   /var/lib/containers/volumes      podman volume data
 #   @data-signalk     /srv/seabird/signalk             Signal-K data
 #   @data-influxdb    /srv/seabird/influxdb            InfluxDB data
@@ -38,6 +40,8 @@ TMPDIR_MOUNT="/mnt/seabird-setup"
 
 declare -A SUBVOLS=(
     [@journal]="/var/log/journal"
+    [@var-tmp]="/var/tmp"
+    [@var-cache]="/var/cache"
     [@containers-storage]="/var/lib/containers"
     [@containers-vol]="/var/lib/containers/volumes"
     [@data-signalk]="/srv/seabird/signalk"
@@ -121,6 +125,8 @@ UNIT_SRC="${SCRIPT_DIR}/../config/systemd"
 
 for unit in \
     seabird-mounts.target \
+    var-tmp.mount \
+    var-cache.mount \
     var-log-journal.mount \
     var-lib-containers.mount \
     var-lib-containers-volumes.mount \
@@ -142,6 +148,10 @@ fi
 
 systemctl daemon-reload
 systemctl enable --now seabird-mounts.target
+
+# /var/tmp must be world-writable with sticky bit
+chmod 1777 /var/tmp
+echo "  /var/tmp permissions set to 1777 (sticky)"
 
 # Verify
 echo ""

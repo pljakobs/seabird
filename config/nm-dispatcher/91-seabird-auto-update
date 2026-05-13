@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# /etc/NetworkManager/dispatcher.d/91-seabird-auto-update
+#
+# Triggers `podman auto-update` when any WAN interface gains full internet
+# connectivity (CONNECTIVITY_STATE=FULL).  This causes containers with
+# AutoUpdate=registry to pull newer images as soon as the boat is online.
+#
+# Only runs when a WAN WiFi (wlan0) or Ethernet (end0) interface transitions to
+# FULL — cellular (wwan0) is excluded to avoid metered data usage on image pulls.
+#
+# Requires podman and the podman-auto-update systemd unit.
+
+set -euo pipefail
+
+IFACE="$1"
+ACTION="$2"
+
+WAN_INTERFACES=(wlan0 end0)
+
+# Only act on WAN interfaces
+IS_WAN=false
+for wan in "${WAN_INTERFACES[@]}"; do
+    if [[ "${IFACE}" == "${wan}" ]]; then
+        IS_WAN=true
+        break
+    fi
+done
+[[ "${IS_WAN}" == true ]] || exit 0
+
+# Only act on connectivity-change events where we just reached FULL internet
+[[ "${ACTION}" == "connectivity-change" ]] || exit 0
+[[ "${CONNECTIVITY_STATE:-}" == "FULL" ]] || exit 0
+
+logger -t seabird-auto-update \
+    "WAN interface ${IFACE} reached FULL connectivity — triggering podman auto-update"
+
+# Run auto-update as a transient systemd unit so it:
+#   - doesn't block the dispatcher (async)
+#   - gets its own cgroup/journal scope
+#   - is rate-limited: skip if another update ran in the last 10 minutes
+LOCK_FILE="/run/seabird/auto-update.lock"
+mkdir -p /run/seabird
+
+if [[ -f "${LOCK_FILE}" ]]; then
+    LOCK_AGE=$(( $(date +%s) - $(stat -c %Y "${LOCK_FILE}") ))
+    if [[ ${LOCK_AGE} -lt 600 ]]; then
+        logger -t seabird-auto-update \
+            "Skipping — last update was ${LOCK_AGE}s ago (cooldown: 600s)"
+        exit 0
+    fi
+fi
+
+touch "${LOCK_FILE}"
+
+systemd-run \
+    --unit=seabird-auto-update \
+    --description="Seabird podman auto-update (triggered by ${IFACE})" \
+    --no-block \
+    /usr/bin/podman auto-update

@@ -129,6 +129,10 @@ echo "Installing captive portal dispatcher..."
 install -m 0755 "${DISPATCHER_SRC}/90-seabird-captive-portal" \
     /etc/NetworkManager/dispatcher.d/90-seabird-captive-portal
 
+echo "Installing auto-update dispatcher..."
+install -m 0755 "${DISPATCHER_SRC}/91-seabird-auto-update" \
+    /etc/NetworkManager/dispatcher.d/91-seabird-auto-update
+
 # ── caddy config (Caddy runs as a Podman quadlet — see config/quadlets/caddy.container)
 
 echo "Installing Caddy config..."

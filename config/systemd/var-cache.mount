@@ -1,0 +1,13 @@
+[Unit]
+Description=NVMe /var/cache (dnf and other package caches)
+DefaultDependencies=no
+After=blockdev@dev-disk-by\x2dlabel-seabird\x2ddata.target
+
+[Mount]
+What=LABEL=seabird-data
+Where=/var/cache
+Type=btrfs
+Options=noatime,compress=zstd:1,space_cache=v2,subvol=@var-cache
+
+[Install]
+WantedBy=seabird-mounts.target

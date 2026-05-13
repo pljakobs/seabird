@@ -1,0 +1,13 @@
+[Unit]
+Description=NVMe /var/tmp (podman image extraction scratch)
+DefaultDependencies=no
+After=blockdev@dev-disk-by\x2dlabel-seabird\x2ddata.target
+
+[Mount]
+What=LABEL=seabird-data
+Where=/var/tmp
+Type=btrfs
+Options=noatime,compress=zstd:1,space_cache=v2,subvol=@var-tmp
+
+[Install]
+WantedBy=seabird-mounts.target
