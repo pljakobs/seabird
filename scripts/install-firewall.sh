@@ -24,7 +24,7 @@ set -euo pipefail
 
 WAN_INTERFACES=(wwan0 wlan0 end0)
 LAN_INTERFACES=(wlp6s0 enp4s0)
-ALLOW_WAN_SSH=no
+ALLOW_WAN_SSH=""   # empty = not yet decided
 
 # ── argument parsing ──────────────────────────────────────────────────────────
 
@@ -54,6 +54,25 @@ DISPATCHER_SRC="${SCRIPT_DIR}/../config/nm-dispatcher"
 if [[ $EUID -ne 0 ]]; then
     echo "error: must be run as root" >&2
     exit 1
+fi
+
+# ── prompt for WAN SSH if not specified and stdin is a terminal ───────────────
+
+if [[ -z "${ALLOW_WAN_SSH}" ]]; then
+    if [[ -t 0 ]]; then
+        echo "SSH on WAN interfaces (wwan0, wlan0, end0):"
+        echo "  Enabling opens port 22 to the internet, installs fail2ban,"
+        echo "  and disables password authentication (key-only login)."
+        read -r -p "Allow SSH on WAN? [y/N]: " _WAN_SSH_ANSWER
+        if [[ "${_WAN_SSH_ANSWER}" =~ ^[Yy]$ ]]; then
+            ALLOW_WAN_SSH=yes
+        else
+            ALLOW_WAN_SSH=no
+        fi
+    else
+        # Non-interactive (called from install-all.sh without flag) — safe default
+        ALLOW_WAN_SSH=no
+    fi
 fi
 
 if ! systemctl is-active --quiet firewalld; then

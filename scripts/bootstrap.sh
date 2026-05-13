@@ -40,7 +40,7 @@ SET_HOSTNAME=true
 SKIP_STORAGE=false
 SKIP_FIREWALL=false
 SKIP_SERVICES=false
-ALLOW_WAN_SSH=no
+ALLOW_WAN_SSH=""   # empty = let install-firewall.sh prompt
 
 # ── argument parsing ──────────────────────────────────────────────────────────
 
@@ -149,7 +149,7 @@ INSTALL_ALL_ARGS=("--nvme-device" "${NVME_DEVICE}")
 [[ "${SKIP_STORAGE}" == true ]]  && INSTALL_ALL_ARGS+=("--skip-storage")
 [[ "${SKIP_FIREWALL}" == true ]] && INSTALL_ALL_ARGS+=("--skip-firewall")
 [[ "${SKIP_SERVICES}" == true ]] && INSTALL_ALL_ARGS+=("--skip-services")
-INSTALL_ALL_ARGS+=("--allow-wan-ssh=${ALLOW_WAN_SSH}")
+[[ -n "${ALLOW_WAN_SSH}" ]] && INSTALL_ALL_ARGS+=("--allow-wan-ssh=${ALLOW_WAN_SSH}")
 
 bash "${SCRIPT_DIR}/install-all.sh" "${INSTALL_ALL_ARGS[@]}"
 

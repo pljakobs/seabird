@@ -31,7 +31,7 @@ SKIP_STORAGE=false
 SKIP_FIREWALL=false
 SKIP_AP=false
 SKIP_SERVICES=false
-ALLOW_WAN_SSH=no
+ALLOW_WAN_SSH=""   # empty = let install-firewall.sh prompt
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -77,7 +77,9 @@ section "2/5  Firewall"
 if [[ "${SKIP_FIREWALL}" == true ]]; then
     echo "  skipping (--skip-firewall)"
 else
-    bash "${SCRIPT_DIR}/install-firewall.sh" "--allow-wan-ssh=${ALLOW_WAN_SSH}"
+    FIREWALL_ARGS=()
+    [[ -n "${ALLOW_WAN_SSH}" ]] && FIREWALL_ARGS+=("--allow-wan-ssh=${ALLOW_WAN_SSH}")
+    bash "${SCRIPT_DIR}/install-firewall.sh" "${FIREWALL_ARGS[@]}"
 fi
 
 # ── 3. WiFi access point ──────────────────────────────────────────────────────
