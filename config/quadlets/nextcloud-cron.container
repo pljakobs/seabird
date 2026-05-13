@@ -8,7 +8,7 @@ RequiresMountsFor=/srv/seabird/nextcloud
 Image=docker.io/library/nextcloud:stable-apache
 ContainerName=nextcloud-cron
 AutoUpdate=registry
-PullPolicy=missing
+Pull=missing
 Pod=nextcloud.pod
 Entrypoint=/cron.sh
 

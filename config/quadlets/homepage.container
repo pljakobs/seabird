@@ -9,7 +9,7 @@ Wants=network-online.target
 Image=ghcr.io/gethomepage/homepage:latest
 ContainerName=homepage
 AutoUpdate=registry
-PullPolicy=missing
+Pull=missing
 
 PublishPort=3002:3000
 

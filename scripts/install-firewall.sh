@@ -60,18 +60,37 @@ fi
 
 if [[ -z "${ALLOW_WAN_SSH}" ]]; then
     if [[ -t 0 ]]; then
-        echo "SSH on WAN interfaces (wwan0, wlan0, end0):"
+        # Detect current state: is ssh present in the wan zone?
+        if firewall-cmd --zone=wan --query-service=ssh &>/dev/null 2>&1; then
+            _WAN_SSH_CURRENT=yes
+        else
+            _WAN_SSH_CURRENT=no
+        fi
+
+        if [[ "${_WAN_SSH_CURRENT}" == yes ]]; then
+            echo "SSH on WAN interfaces is currently: ENABLED"
+        else
+            echo "SSH on WAN interfaces is currently: DISABLED"
+        fi
         echo "  Enabling opens port 22 to the internet, installs fail2ban,"
         echo "  and disables password authentication (key-only login)."
-        read -r -p "Allow SSH on WAN? [y/N]: " _WAN_SSH_ANSWER
-        if [[ "${_WAN_SSH_ANSWER}" =~ ^[Yy]$ ]]; then
+        read -r -p "Change this setting? [y/N]: " _WAN_SSH_CHANGE
+        if [[ "${_WAN_SSH_CHANGE}" =~ ^[Yy]$ ]]; then
+            if [[ "${_WAN_SSH_CURRENT}" == yes ]]; then
+                ALLOW_WAN_SSH=no
+            else
+                ALLOW_WAN_SSH=yes
+            fi
+        else
+            ALLOW_WAN_SSH="${_WAN_SSH_CURRENT}"
+        fi
+    else
+        # Non-interactive (called from install-all.sh without flag) — preserve current state
+        if firewall-cmd --zone=wan --query-service=ssh &>/dev/null 2>&1; then
             ALLOW_WAN_SSH=yes
         else
             ALLOW_WAN_SSH=no
         fi
-    else
-        # Non-interactive (called from install-all.sh without flag) — safe default
-        ALLOW_WAN_SSH=no
     fi
 fi
 

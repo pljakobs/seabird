@@ -9,7 +9,7 @@ Wants=network-online.target
 Image=docker.io/library/caddy:latest
 ContainerName=caddy
 AutoUpdate=registry
-PullPolicy=missing
+Pull=missing
 
 # Host network so Caddy binds directly to the LAN IP on port 80
 # and can initiate connections to captive portals via wlan0

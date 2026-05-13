@@ -27,6 +27,18 @@ for mp in /srv/seabird/signalk /var/log/journal /var/lib/containers; do
     fi
 done
 
+# ── stop running seabird services before updating quadlets ───────────────────
+
+if systemctl is-active --quiet seabird-services.target 2>/dev/null; then
+    echo "Stopping seabird-services.target before updating quadlets..."
+    systemctl stop seabird-services.target
+elif systemctl list-units --state=active --no-legend 2>/dev/null | grep -qE "caddy|influxdb|signalk|grafana|homepage|pihole|navidrome|nextcloud-pod"; then
+    echo "Stopping individual seabird services before updating quadlets..."
+    for svc in caddy influxdb signalk grafana homepage pihole navidrome nextcloud-pod; do
+        systemctl stop "${svc}.service" 2>/dev/null || true
+    done
+fi
+
 # ── install quadlets ──────────────────────────────────────────────────────────
 
 echo "Installing quadlets to ${QUADLET_DEST}..."

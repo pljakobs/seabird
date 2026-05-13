@@ -11,7 +11,7 @@ RequiresMountsFor=/srv/seabird/pihole
 Image=docker.io/pihole/pihole:latest
 ContainerName=pihole
 AutoUpdate=registry
-PullPolicy=missing
+Pull=missing
 
 # Host network required so Pi-hole can bind port 53 on the AP interface
 Network=host

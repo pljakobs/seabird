@@ -10,7 +10,7 @@ RequiresMountsFor=/srv/seabird/navidrome /srv/seabird/music
 Image=docker.io/deluan/navidrome:latest
 ContainerName=navidrome
 AutoUpdate=registry
-PullPolicy=missing
+Pull=missing
 
 PublishPort=4533:4533
 
