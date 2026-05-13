@@ -4,6 +4,7 @@ PartOf=seabird-services.target visualization
 Documentation=https://grafana.com/docs
 After=network-online.target influxdb.service
 Wants=network-online.target
+RequiresMountsFor=/srv/seabird/grafana
 
 [Container]
 Image=docker.io/grafana/grafana-oss:latest

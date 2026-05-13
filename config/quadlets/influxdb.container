@@ -4,6 +4,7 @@ PartOf=seabird-services.target
 Documentation=https://docs.influxdata.com
 After=network-online.target
 Wants=network-online.target
+RequiresMountsFor=/srv/seabird/influxdb
 
 [Container]
 Image=docker.io/influxdb:2-alpine

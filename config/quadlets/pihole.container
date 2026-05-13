@@ -5,6 +5,7 @@ Documentation=https://pi-hole.net
 # Pi-hole must be up before services that rely on DNS resolution
 After=network-online.target
 Wants=network-online.target
+RequiresMountsFor=/srv/seabird/pihole
 
 [Container]
 Image=docker.io/pihole/pihole:latest

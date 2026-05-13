@@ -2,6 +2,7 @@
 Description=Nextcloud application
 After=nextcloud-db.service nextcloud-redis.service
 Requires=nextcloud-db.service
+RequiresMountsFor=/srv/seabird/nextcloud
 
 [Container]
 Image=docker.io/library/nextcloud:stable-apache

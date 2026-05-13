@@ -2,6 +2,7 @@
 Description=Nextcloud background cron jobs
 After=nextcloud.service
 Requires=nextcloud.service
+RequiresMountsFor=/srv/seabird/nextcloud
 
 [Container]
 Image=docker.io/library/nextcloud:stable-apache

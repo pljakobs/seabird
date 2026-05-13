@@ -2,6 +2,7 @@
 Description=Nextcloud database (PostgreSQL)
 After=network-online.target
 Wants=network-online.target
+RequiresMountsFor=/srv/seabird/nextcloud
 
 [Container]
 Image=docker.io/library/postgres:16-alpine
