@@ -95,7 +95,7 @@ SERVICES=(
 
 for svc in "${SERVICES[@]}"; do
     unit="${svc}.service"
-    if systemctl cat "${unit}" &>/dev/null; then
+    if systemctl show "${unit}" --property=LoadState 2>/dev/null | grep -q "LoadState=loaded"; then
         systemctl enable --now "${unit}"
         echo "  ✓ ${unit}"
     else
