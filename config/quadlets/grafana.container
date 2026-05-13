@@ -1,6 +1,6 @@
 [Unit]
 Description=Grafana
-PartOf=seabird-services.target visualization
+PartOf=seabird-services.target
 Documentation=https://grafana.com/docs
 After=network-online.target influxdb.service
 Wants=network-online.target

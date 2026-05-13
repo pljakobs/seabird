@@ -104,22 +104,25 @@ fi
 
 section "5/5  Starting services"
 
-# Reload to pick up any newly installed quadlets / systemd units
-systemctl daemon-reload
+# install-services.sh already ran daemon-reload; run it once more here only
+# if services were skipped (so quadlet generator output is always fresh)
+if [[ "${SKIP_SERVICES}" == true ]]; then
+    systemctl daemon-reload
+fi
 
-# Quadlet generator writes to /run/systemd/generator/ — check it produced output
+# Quadlet generator writes to /run/systemd/generator/
 GEN_DIR="/run/systemd/generator"
 QUADLET_UNITS=$(ls "${GEN_DIR}"/*.service "${GEN_DIR}"/*.pod 2>/dev/null | \
-    grep -E "caddy|signalk|influxdb|grafana|nextcloud|homepage|pihole" || true)
+    grep -E "caddy|signalk|influxdb|grafana|nextcloud|homepage|pihole|navidrome" || true)
 
 if [[ -z "${QUADLET_UNITS}" ]]; then
-    echo "  WARNING: quadlet generator produced no units — running generator manually to capture errors:"
+    echo "  WARNING: quadlet generator produced no units — dumping generator errors:"
     mkdir -p /tmp/quadlet-gen-test
     /usr/lib/systemd/system-generators/podman-system-generator \
         /tmp/quadlet-gen-test /tmp/quadlet-gen-test /tmp/quadlet-gen-test 2>&1 || true
     echo "  Generator test output in /tmp/quadlet-gen-test/:"
     ls /tmp/quadlet-gen-test/ 2>/dev/null || echo "    (empty)"
-    echo "  Also check: journalctl -b | grep -i quadlet"
+    echo "  Check quadlet syntax: journalctl -b | grep -i quadlet"
     echo
 fi
 
@@ -136,11 +139,16 @@ SERVICES=(
 
 for svc in "${SERVICES[@]}"; do
     unit="${svc}.service"
-    if systemctl show "${unit}" --property=LoadState 2>/dev/null | grep -q "LoadState=loaded"; then
-        systemctl start "${unit}"
-        echo "  ✓ ${unit}"
+    # Check the generator output directly — more reliable than LoadState after
+    # a daemon-reload that may have partially failed
+    if [[ -f "${GEN_DIR}/${unit}" ]]; then
+        if systemctl start "${unit}"; then
+            echo "  ✓ ${unit}"
+        else
+            echo "  ✗ ${unit} failed to start — check: journalctl -u ${unit} -e" >&2
+        fi
     else
-        echo "  ✗ ${unit} not found — skipping" >&2
+        echo "  ✗ ${unit} not in generator output — quadlet error?" >&2
     fi
 done
 
