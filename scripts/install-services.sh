@@ -20,7 +20,7 @@ fi
 
 # ── check NVMe mounts ─────────────────────────────────────────────────────────
 
-for mp in /srv/seabird /var/log/journal /var/lib/containers/volumes; do
+for mp in /srv/seabird/signalk /var/log/journal /var/lib/containers/volumes; do
     if ! mountpoint -q "${mp}"; then
         echo "error: ${mp} is not mounted — run install-storage.sh first" >&2
         exit 1

@@ -61,6 +61,17 @@ fi
 
 CURRENT_FS=$(blkid -o value -s TYPE "${DEVICE}" 2>/dev/null || true)
 
+# Also refuse to proceed if the device has a partition table — we expect
+# btrfs directly on the raw device, not on a partition.
+if lsblk -nlo TYPE "${DEVICE}" 2>/dev/null | grep -q "^part$" || \
+   lsblk -nlo CHILDREN "${DEVICE}" 2>/dev/null | grep -q "^${DEVICE}p"; then
+    echo "error: ${DEVICE} appears to have partitions." >&2
+    echo "       This script expects btrfs directly on the raw device." >&2
+    echo "       If you want to reformat, wipe the partition table first:" >&2
+    echo "         wipefs -a ${DEVICE}" >&2
+    exit 1
+fi
+
 if [[ "${CURRENT_FS}" == "btrfs" ]]; then
     echo "${DEVICE} is already btrfs — skipping format"
 else
