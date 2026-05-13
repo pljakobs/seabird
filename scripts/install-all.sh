@@ -112,7 +112,7 @@ SERVICES=(
 for svc in "${SERVICES[@]}"; do
     unit="${svc}.service"
     if systemctl show "${unit}" --property=LoadState 2>/dev/null | grep -q "LoadState=loaded"; then
-        systemctl enable --now "${unit}"
+        systemctl start "${unit}"
         echo "  ✓ ${unit}"
     else
         echo "  ✗ ${unit} not found — skipping" >&2
