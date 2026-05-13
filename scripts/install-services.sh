@@ -187,6 +187,19 @@ for unit in seabird-nc-scan@.service seabird-nc-scan@.timer seabird-services.tar
     echo "  /etc/systemd/system/${unit}"
 done
 
+# ── Docker Hub credentials for systemd services ──────────────────────────────
+# systemd services run without XDG_RUNTIME_DIR so they cannot find credentials
+# stored in /run/user/0/containers/auth.json — copy to the system-wide location.
+echo "Checking Docker Hub credentials for systemd services..."
+if [[ -f /run/user/0/containers/auth.json ]]; then
+    install -m 0600 /run/user/0/containers/auth.json /etc/containers/auth.json
+    echo "  credentials copied to /etc/containers/auth.json"
+elif [[ ! -s /etc/containers/auth.json ]]; then
+    echo "  WARNING: No Docker Hub credentials found."
+    echo "  Run 'podman login docker.io' then re-run this script,"
+    echo "  or images will be pulled unauthenticated (rate-limited)."
+fi
+
 # ── reload systemd to pick up quadlets ───────────────────────────────────────
 
 echo ""
