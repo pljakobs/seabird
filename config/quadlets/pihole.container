@@ -25,8 +25,8 @@ Volume=/srv/seabird/pihole/etc-dnsmasq.d:/etc/dnsmasq.d:Z
 # TZ           — e.g. Europe/Berlin
 EnvironmentFile=/etc/seabird/pihole.env
 
-# Web UI on 3003 to avoid clash with Caddy on 80
-Environment=WEB_PORT=3003
+# Web UI on 3003 to avoid clash with Caddy on 80 (v6+ variable name)
+Environment=FTLCONF_webserver_port=3003
 # Listen on all local (non-loopback) interfaces for DNS
 Environment=DNSMASQ_LISTENING=local
 
