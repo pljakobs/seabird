@@ -95,9 +95,30 @@ else
     echo "  /etc/seabird/influxdb.env already exists — skipping"
 fi
 
+# ── nextcloud.env — auto-generate secrets on first install ──────────────────
+
+NEXTCLOUD_ENV="/etc/seabird/nextcloud.env"
+if [[ ! -f "${NEXTCLOUD_ENV}" ]]; then
+    NC_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)"
+    NC_ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)"
+    cat > "${NEXTCLOUD_ENV}" <<EOF
+POSTGRES_PASSWORD=${NC_DB_PASSWORD}
+NEXTCLOUD_ADMIN_USER=admin
+NEXTCLOUD_ADMIN_PASSWORD=${NC_ADMIN_PASSWORD}
+EOF
+    chmod 0600 "${NEXTCLOUD_ENV}"
+    echo "  generated /etc/seabird/nextcloud.env with random passwords"
+    echo "  !! Save these credentials — they are only shown once !!"
+    echo "    Nextcloud admin user     : admin"
+    echo "    Nextcloud admin password : ${NC_ADMIN_PASSWORD}"
+    echo "    Nextcloud DB password    : ${NC_DB_PASSWORD}"
+else
+    echo "  /etc/seabird/nextcloud.env already exists — skipping"
+fi
+
 # ── remaining env stubs (touch-only if missing) ───────────────────────────────
 
-for f in grafana.env nextcloud.env pihole.env; do
+for f in grafana.env pihole.env; do
     dest="/etc/seabird/${f}"
     if [[ ! -f "${dest}" ]]; then
         touch "${dest}"
@@ -106,12 +127,7 @@ for f in grafana.env nextcloud.env pihole.env; do
     fi
 done
 
-# nextcloud.env needs at minimum POSTGRES_PASSWORD and NEXTCLOUD_ADMIN_*
-cat > /etc/seabird/nextcloud.env.example <<'EOF'
-POSTGRES_PASSWORD=changeme
-NEXTCLOUD_ADMIN_USER=admin
-NEXTCLOUD_ADMIN_PASSWORD=changeme
-EOF
+# nextcloud.env is auto-generated above
 
 echo "  For Pi-hole, set WEBPASSWORD and TZ in /etc/seabird/pihole.env"
 echo "  Example: echo 'WEBPASSWORD=yourpassword' >> /etc/seabird/pihole.env"

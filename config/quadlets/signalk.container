@@ -18,6 +18,9 @@ PublishPort=3000:3000
 # Persistent data — plugin config, vessel data, log files
 Volume=/srv/seabird/signalk:/home/node/.signalk:Z
 
+# Run as root so it can write to the root-owned Z-labeled volume
+User=root
+
 # Signal-K needs to know the vessel MMSI/name — configure via
 # /srv/seabird/signalk/settings.json on first start or via the web UI
 # at http://seabird.local:3000
