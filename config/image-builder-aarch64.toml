@@ -1,7 +1,0 @@
-# bootc-image-builder configuration for CM4 / aarch64
-#
-# This mirrors the freebird layout: keep disk-specific tuning outside the image
-# and feed it to bootc-image-builder at raw image generation time.
-
-[customizations.kernel]
-append = "quiet systemd.unified_cgroup_hierarchy=1 cma=256M"
