@@ -10,6 +10,7 @@ RequiresMountsFor=/srv/seabird/grafana
 Image=docker.io/grafana/grafana-oss:latest
 ContainerName=grafana
 AutoUpdate=registry
+PullPolicy=missing
 
 PublishPort=3001:3000
 

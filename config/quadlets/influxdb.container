@@ -10,6 +10,7 @@ RequiresMountsFor=/srv/seabird/influxdb
 Image=docker.io/influxdb:2-alpine
 ContainerName=influxdb
 AutoUpdate=registry
+PullPolicy=missing
 
 PublishPort=8086:8086
 

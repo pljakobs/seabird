@@ -8,6 +8,7 @@ RequiresMountsFor=/srv/seabird/nextcloud
 Image=docker.io/library/postgres:16-alpine
 ContainerName=nextcloud-db
 AutoUpdate=registry
+PullPolicy=missing
 Pod=nextcloud.pod
 
 Volume=/srv/seabird/nextcloud/db:/var/lib/postgresql/data:Z

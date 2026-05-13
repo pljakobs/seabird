@@ -8,6 +8,7 @@ RequiresMountsFor=/srv/seabird/nextcloud
 Image=docker.io/library/nextcloud:stable-apache
 ContainerName=nextcloud
 AutoUpdate=registry
+PullPolicy=missing
 Pod=nextcloud.pod
 
 Volume=/srv/seabird/nextcloud/html:/var/www/html:Z

@@ -1,6 +1,6 @@
 [Unit]
-Description=Caddy reverse proxy
-PartOf=seabird-services.target / seabird landing page
+Description=Caddy reverse proxy — seabird landing page
+PartOf=seabird-services.target
 Documentation=https://caddyserver.com/docs
 After=network-online.target
 Wants=network-online.target
@@ -9,6 +9,7 @@ Wants=network-online.target
 Image=docker.io/library/caddy:latest
 ContainerName=caddy
 AutoUpdate=registry
+PullPolicy=missing
 
 # Host network so Caddy binds directly to the LAN IP on port 80
 # and can initiate connections to captive portals via wlan0

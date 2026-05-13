@@ -10,6 +10,7 @@ RequiresMountsFor=/srv/seabird/signalk
 Image=docker.io/signalk/signalk-server:latest
 ContainerName=signalk
 AutoUpdate=registry
+PullPolicy=missing
 
 # Publish Signal-K HTTP/WS on port 3000
 PublishPort=3000:3000
