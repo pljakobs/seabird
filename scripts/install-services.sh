@@ -110,7 +110,7 @@ fi
 # ── nextcloud.env — auto-generate secrets on first install ──────────────────
 
 NEXTCLOUD_ENV="/etc/seabird/nextcloud.env"
-if [[ ! -f "${NEXTCLOUD_ENV}" ]]; then
+if [[ ! -s "${NEXTCLOUD_ENV}" ]]; then
     NC_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)"
     NC_ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)"
     cat > "${NEXTCLOUD_ENV}" <<EOF
@@ -125,7 +125,7 @@ EOF
     echo "    Nextcloud admin password : ${NC_ADMIN_PASSWORD}"
     echo "    Nextcloud DB password    : ${NC_DB_PASSWORD}"
 else
-    echo "  /etc/seabird/nextcloud.env already exists — skipping"
+    echo "  /etc/seabird/nextcloud.env already exists and is non-empty — skipping"
 fi
 
 # ── remaining env stubs (touch-only if missing) ───────────────────────────────
