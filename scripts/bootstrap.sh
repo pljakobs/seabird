@@ -10,12 +10,13 @@
 # What it does (all steps are idempotent — safe to re-run):
 #   1. Install required host packages via dnf
 #   2. Apply pcie-32bit-dma overlay (5G modem DMA fix)
-#   3. Set hostname to seabird (skip with --no-hostname)
-#   4. Format NVMe and create btrfs subvolumes  →  install-storage.sh
-#   5. Deploy firewalld zones, captive portal, Caddy  →  install-firewall.sh
-#   6. Deploy service quadlets  →  install-services.sh
-#   7. Enable podman auto-update timer
-#   8. Print secrets reminder and next steps
+#   3. Disable PCI runtime PM for the Foxconn X55 modem (stability fix)
+#   4. Set hostname to seabird (skip with --no-hostname)
+#   5. Format NVMe and create btrfs subvolumes  →  install-storage.sh
+#   6. Deploy firewalld zones, captive portal, Caddy  →  install-firewall.sh
+#   7. Deploy service quadlets  →  install-services.sh
+#   8. Enable podman auto-update timer
+#   9. Print secrets reminder and next steps
 #
 # Options:
 #   --nvme-device DEV        NVMe device to use (default: /dev/nvme0n1)
@@ -34,6 +35,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+MODEM_UDEV_RULE_SRC="${REPO_ROOT}/config/udev/99-seabird-foxconn-x55-power.rules"
 
 NVME_DEVICE="/dev/nvme0n1"
 SET_HOSTNAME=true
@@ -128,9 +130,35 @@ else
     info "A reboot is required for the 5G modem to work — bootstrap will continue"
 fi
 
-# ── 3. Hostname ───────────────────────────────────────────────────────────────
+# ── 3. Modem runtime PM fix ───────────────────────────────────────────────────
 
-section "3/7  Hostname"
+section "3/7  X55 runtime PM fix"
+
+if [[ -f "${MODEM_UDEV_RULE_SRC}" ]]; then
+    install -D -m 0644 "${MODEM_UDEV_RULE_SRC}" \
+        /etc/udev/rules.d/99-seabird-foxconn-x55-power.rules
+    udevadm control --reload-rules
+
+    _MODEM_PM_APPLIED=false
+    for dev in /sys/bus/pci/devices/*; do
+        [[ -f "${dev}/vendor" && -f "${dev}/device" && -w "${dev}/power/control" ]] || continue
+        if [[ "$(<"${dev}/vendor")" == "0x03f0" && "$(<"${dev}/device")" == "0x0a6c" ]]; then
+            echo on > "${dev}/power/control"
+            ok "Disabled runtime PM for modem at ${dev##*/}"
+            _MODEM_PM_APPLIED=true
+        fi
+    done
+
+    if [[ "${_MODEM_PM_APPLIED}" != true ]]; then
+        info "No matching X55 modem present now; udev rule will apply when detected"
+    fi
+else
+    echo "warning: ${MODEM_UDEV_RULE_SRC} not found — skipping modem runtime PM fix" >&2
+fi
+
+# ── 4. Hostname ───────────────────────────────────────────────────────────────
+
+section "4/7  Hostname"
 
 if [[ "${SET_HOSTNAME}" == true ]]; then
     current_hostname="$(hostnamectl --static)"
@@ -144,9 +172,9 @@ else
     info "Skipping hostname configuration (--no-hostname)"
 fi
 
-# ── 4–7. Storage, firewall, services, start ──────────────────────────────────
+# ── 5–8. Storage, firewall, services, start ──────────────────────────────────
 
-section "4/4  Install and start all services"
+section "5/8  Install and start all services"
 
 INSTALL_ALL_ARGS=("--nvme-device" "${NVME_DEVICE}")
 [[ "${SKIP_STORAGE}" == true ]]  && INSTALL_ALL_ARGS+=("--skip-storage")
@@ -173,11 +201,13 @@ echo "║                                                               ║"
 echo "║  2. If the pcie-32bit-dma overlay was just added:             ║"
 echo "║     reboot now, then come back and start services.           ║"
 echo "║                                                               ║"
-echo "║  3. Start services:                                           ║"
+echo "║  3. The X55 modem runtime PM fix is installed via udev.       ║"
+echo "║                                                               ║"
+echo "║  4. Start services:                                           ║"
 echo "║     systemctl daemon-reload                                   ║"
 echo "║     systemctl enable --now signalk influxdb grafana \\        ║"
 echo "║       nextcloud-pod homepage                                  ║"
 echo "║                                                               ║"
-echo "║  4. Open dashboard:  http://seabird.local:3002               ║"
+echo "║  5. Open dashboard:  http://seabird.local:3002               ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo

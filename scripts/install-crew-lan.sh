@@ -44,6 +44,7 @@ fi
 nmcli con modify "${NM_CONN}" \
     connection.interface-name "${LAN_IFACE}" \
     connection.autoconnect yes \
+    connection.zone lan \
     ipv4.method shared \
     ipv4.addresses "${LAN_IP}" \
     ipv6.method ignore

@@ -1,0 +1,1 @@
+ACTION=="add|change", SUBSYSTEM=="pci", ATTR{vendor}=="0x03f0", ATTR{device}=="0x0a6c", TEST=="power/control", ATTR{power/control}="on"
