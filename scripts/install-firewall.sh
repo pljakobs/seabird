@@ -307,6 +307,10 @@ echo "Installing auto-update dispatcher..."
 install -m 0755 "${DISPATCHER_SRC}/91-seabird-auto-update" \
     /etc/NetworkManager/dispatcher.d/91-seabird-auto-update
 
+echo "Installing policy routing dispatcher..."
+install -m 0755 "${DISPATCHER_SRC}/92-seabird-policy-routing" \
+    /etc/NetworkManager/dispatcher.d/92-seabird-policy-routing
+
 # ── caddy config (Caddy runs as a Podman quadlet — see config/quadlets/caddy.container)
 
 echo "Installing Caddy config..."

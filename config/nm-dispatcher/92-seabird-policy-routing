@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# /etc/NetworkManager/dispatcher.d/92-seabird-policy-routing
+#
+# Keeps source-based policy routing in sync for WWAN so traffic sourced from
+# wwan0's address always egresses via wwan0 (not another lower-metric default).
+
+set -euo pipefail
+
+IFACE="${1:-}"
+ACTION="${2:-}"
+
+# We only manage WWAN source policy here.
+[[ "${IFACE}" == "wwan0" ]] || exit 0
+
+TABLE_ID=102
+RULE_PREF=11020
+
+_cleanup() {
+    ip rule del pref "${RULE_PREF}" 2>/dev/null || true
+    ip route flush table "${TABLE_ID}" 2>/dev/null || true
+}
+
+case "${ACTION}" in
+    down|pre-down)
+        _cleanup
+        exit 0
+        ;;
+    up|dhcp4-change|dhcp6-change|connectivity-change)
+        ;;
+    *)
+        exit 0
+        ;;
+esac
+
+WWAN_IP="$(ip -4 -o addr show dev wwan0 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)"
+WWAN_GW="$(ip -4 route show dev wwan0 default 2>/dev/null | awk '/default via/{print $3; exit}')"
+WWAN_LINK_ROUTE="$(ip -4 route show dev wwan0 proto kernel scope link 2>/dev/null | head -1 || true)"
+
+if [[ -z "${WWAN_IP}" || -z "${WWAN_GW}" ]]; then
+    # Interface not fully configured yet; leave existing rule as-is for now.
+    exit 0
+fi
+
+ip route replace table "${TABLE_ID}" default via "${WWAN_GW}" dev wwan0 src "${WWAN_IP}"
+if [[ -n "${WWAN_LINK_ROUTE}" ]]; then
+    ip route replace table "${TABLE_ID}" ${WWAN_LINK_ROUTE}
+fi
+
+ip rule del pref "${RULE_PREF}" 2>/dev/null || true
+ip rule add pref "${RULE_PREF}" from "${WWAN_IP}/32" lookup "${TABLE_ID}"
+
+exit 0
