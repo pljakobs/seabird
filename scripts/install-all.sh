@@ -5,12 +5,15 @@
 # Safe to re-run at any time — all steps are idempotent.
 #
 # Usage:
-#   sudo scripts/install-all.sh [--nvme-device DEV] [--allow-wan-ssh=yes|no] [--mode=prod|dev]
+#   sudo scripts/install-all.sh [--nvme-device DEV] [--hostname NAME|--no-hostname]
+#                               [--allow-wan-ssh=yes|no] [--mode=prod|dev]
 #                               [--headscale-join=yes|no] [--headscale-login-server URL]
 #                               [--headscale-auth-key KEY] [--skip-headscale]
 #
 # Options:
 #   --nvme-device DEV        NVMe block device to use (default: /dev/nvme0n1)
+#   --hostname NAME          Set static hostname (default: seabird)
+#   --no-hostname            Skip hostname configuration
 #   --allow-wan-ssh=yes|no   Open SSH on WAN zone with fail2ban (default: no)
 #   --mode=prod|dev          Firewall mode for install-firewall.sh (default: prod)
 #   --headscale-join=yes|no  Join Headscale network during install (default: prompt)
@@ -20,7 +23,6 @@
 #
 # This script does NOT touch:
 #   - Host OS packages (dnf)        → run scripts/bootstrap.sh for first-time setup
-#   - Hostname                      → run scripts/bootstrap.sh
 #   - PCIe DMA overlay              → run scripts/bootstrap.sh
 #   - Per-user Nextcloud mounts     → run scripts/add-user.sh <username>
 #
@@ -34,6 +36,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NVME_DEVICE="/dev/nvme0n1"
+TARGET_HOSTNAME="seabird"
+SET_HOSTNAME=true
 SKIP_STORAGE=false
 SKIP_FIREWALL=false
 SKIP_AP=false
@@ -48,6 +52,8 @@ HEADSCALE_AUTH_KEY=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --nvme-device)       NVME_DEVICE="$2"; shift 2 ;;
+        --hostname)          TARGET_HOSTNAME="$2"; shift 2 ;;
+        --no-hostname)       SET_HOSTNAME=false; shift ;;
         --skip-storage)      SKIP_STORAGE=true; shift ;;
         --skip-firewall)     SKIP_FIREWALL=true; shift ;;
         --skip-ap)           SKIP_AP=true; shift ;;
@@ -100,18 +106,33 @@ fi
 
 section() { echo; echo "══════════════════════════════════════════"; echo "  $*"; echo "══════════════════════════════════════════"; }
 
-# ── 1. Storage ────────────────────────────────────────────────────────────────
+# ── 1. Hostname ───────────────────────────────────────────────────────────────
 
-section "1/5  Storage"
+section "1/7  Hostname"
+if [[ "${SET_HOSTNAME}" == true ]]; then
+    current_hostname="$(hostnamectl --static 2>/dev/null || hostname)"
+    if [[ "${current_hostname}" == "${TARGET_HOSTNAME}" ]]; then
+        echo "  hostname already set to '${TARGET_HOSTNAME}'"
+    else
+        hostnamectl set-hostname "${TARGET_HOSTNAME}"
+        echo "  hostname set to '${TARGET_HOSTNAME}' (was '${current_hostname}')"
+    fi
+else
+    echo "  skipping (--no-hostname)"
+fi
+
+# ── 2. Storage ────────────────────────────────────────────────────────────────
+
+section "2/7  Storage"
 if [[ "${SKIP_STORAGE}" == true ]]; then
     echo "  skipping (--skip-storage)"
 else
     bash "${SCRIPT_DIR}/install-storage.sh" "${NVME_DEVICE}"
 fi
 
-# ── 2. Firewall + Caddy config ────────────────────────────────────────────────
+# ── 3. Firewall + Caddy config ────────────────────────────────────────────────
 
-section "2/5  Firewall"
+section "3/7  Firewall"
 if [[ "${SKIP_FIREWALL}" == true ]]; then
     echo "  skipping (--skip-firewall)"
 else
@@ -121,27 +142,27 @@ else
     bash "${SCRIPT_DIR}/install-firewall.sh" "${FIREWALL_ARGS[@]}"
 fi
 
-# ── 3. WiFi access point ──────────────────────────────────────────────────────
+# ── 4. WiFi access point ──────────────────────────────────────────────────────
 
-section "3/5  WiFi access point"
+section "4/7  WiFi access point"
 if [[ "${SKIP_AP}" == true ]]; then
     echo "  skipping (--skip-ap)"
 else
     bash "${SCRIPT_DIR}/install-ap.sh"
 fi
 
-# ── 4. Service quadlets ───────────────────────────────────────────────────────
+# ── 5. Service quadlets ───────────────────────────────────────────────────────
 
-section "4/5  Services"
+section "5/7  Services"
 if [[ "${SKIP_SERVICES}" == true ]]; then
     echo "  skipping (--skip-services)"
 else
     bash "${SCRIPT_DIR}/install-services.sh"
 fi
 
-# ── 5. Headscale / Tailscale join ────────────────────────────────────────────
+# ── 6. Headscale / Tailscale join ────────────────────────────────────────────
 
-section "5/6  Headscale network"
+section "6/7  Headscale network"
 if [[ "${SKIP_HEADSCALE}" == true ]]; then
     echo "  skipping (--skip-headscale)"
 else
@@ -152,9 +173,9 @@ else
     bash "${SCRIPT_DIR}/install-headscale.sh" "${HEADSCALE_ARGS[@]}"
 fi
 
-# ── 6. Enable and start all services ─────────────────────────────────────────
+# ── 7. Enable and start all services ─────────────────────────────────────────
 
-section "6/6  Starting services"
+section "7/7  Starting services"
 
 # install-services.sh already ran daemon-reload; run it once more here only
 # if services were skipped (so quadlet generator output is always fresh)
