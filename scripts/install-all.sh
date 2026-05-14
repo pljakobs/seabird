@@ -142,9 +142,12 @@ else
     bash "${SCRIPT_DIR}/install-firewall.sh" "${FIREWALL_ARGS[@]}"
 fi
 
-# ── 4. WiFi access point ──────────────────────────────────────────────────────
+# ── 4. Wired crew LAN + WiFi access point ────────────────────────────────────
 
-section "4/7  WiFi access point"
+section "4/7  Wired crew LAN + WiFi access point"
+echo "  configuring wired crew LAN..."
+bash "${SCRIPT_DIR}/install-crew-lan.sh"
+
 if [[ "${SKIP_AP}" == true ]]; then
     echo "  skipping (--skip-ap)"
 else
