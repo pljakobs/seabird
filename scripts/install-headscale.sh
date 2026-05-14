@@ -5,9 +5,10 @@
 #   sudo scripts/install-headscale.sh [--join=yes|no] [--login-server URL] [--auth-key KEY] [--hostname NAME]
 #
 # Options:
-#   --join=yes|no          Join Headscale network now. If omitted, prompt in interactive mode.
+#   --join=yes|no          Join/rejoin Headscale network now. If omitted, auto-skip when already connected;
+#                         otherwise prompt in interactive mode.
 #   --login-server URL     Headscale control server URL (e.g. https://hs.example.com)
-#   --auth-key KEY         Preauth key for this node
+#   --auth-key KEY         Preauth key for this node; implies --join=yes unless explicitly disabled
 #   --hostname NAME        Tailscale node hostname (default: current static hostname)
 
 set -euo pipefail
@@ -37,6 +38,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Supplying an auth key should be enough for non-interactive automatic join.
+if [[ -n "${AUTH_KEY}" && -z "${JOIN}" ]]; then
+    JOIN=yes
+fi
+
 if [[ $EUID -ne 0 ]]; then
     echo "error: must be run as root" >&2
     exit 1
@@ -59,19 +65,22 @@ fi
 echo "Enabling tailscaled..."
 systemctl enable --now tailscaled
 
+# Detect current connectivity once; used for skip/prompt behavior below.
+if tailscale status --self &>/dev/null; then
+    CURRENT_JOINED=yes
+else
+    CURRENT_JOINED=no
+fi
+
+# If already connected and no explicit join/rejoin requested, skip this step.
+if [[ -z "${JOIN}" && "${CURRENT_JOINED}" == yes ]]; then
+    echo "Tailscale is already connected — skipping Headscale join step."
+    JOIN=no
+fi
+
 if [[ -z "${JOIN}" ]]; then
     if [[ -t 0 ]]; then
-        if tailscale status &>/dev/null; then
-            _CURRENT_JOINED=yes
-        else
-            _CURRENT_JOINED=no
-        fi
-
-        if [[ "${_CURRENT_JOINED}" == yes ]]; then
-            echo "Tailscale is currently: CONNECTED"
-        else
-            echo "Tailscale is currently: NOT CONNECTED"
-        fi
+        echo "Tailscale is currently: NOT CONNECTED"
         read -r -p "Change this setting? Join/rejoin Headscale now? [y/N]: " _JOIN_CHANGE
         if [[ "${_JOIN_CHANGE}" =~ ^[Yy]$ ]]; then
             JOIN=yes

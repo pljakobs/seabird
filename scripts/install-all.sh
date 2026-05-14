@@ -88,6 +88,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# If an auth key is provided, treat it as explicit intent to auto-join.
+if [[ -n "${HEADSCALE_AUTH_KEY}" && -z "${HEADSCALE_JOIN}" ]]; then
+    HEADSCALE_JOIN=yes
+fi
+
 if [[ $EUID -ne 0 ]]; then
     echo "error: must be run as root" >&2
     exit 1

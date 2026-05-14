@@ -28,7 +28,7 @@ set -euo pipefail
 WAN_INTERFACES=(wwan0 wlan0 end0)
 LAN_INTERFACES=(wlp6s0 enp4s0)
 ALLOW_WAN_SSH=""   # empty = not yet decided
-MODE="prod"        # prod|dev
+MODE=""            # empty = not yet decided
 
 # ── argument parsing ──────────────────────────────────────────────────────────
 
@@ -66,6 +66,40 @@ DISPATCHER_SRC="${SCRIPT_DIR}/../config/nm-dispatcher"
 if [[ $EUID -ne 0 ]]; then
     echo "error: must be run as root" >&2
     exit 1
+fi
+
+# ── prompt for firewall mode if not specified and stdin is a terminal ───────
+
+if [[ -z "${MODE}" ]]; then
+    _END0_ZONE=$(firewall-cmd --get-zone-of-interface=end0 2>/dev/null || true)
+    if [[ "${_END0_ZONE}" == "lan" ]]; then
+        _CURRENT_MODE=dev
+    else
+        _CURRENT_MODE=prod
+    fi
+
+    if [[ -t 0 ]]; then
+        if [[ "${_CURRENT_MODE}" == "dev" ]]; then
+            echo "Firewall mode is currently: DEVELOPMENT"
+            echo "  end0 is in LAN (services reachable from upstream interface)."
+        else
+            echo "Firewall mode is currently: PRODUCTION"
+            echo "  end0 is in WAN (upstream side firewalled)."
+        fi
+        read -r -p "Change this setting? [y/N]: " _MODE_CHANGE
+        if [[ "${_MODE_CHANGE}" =~ ^[Yy]$ ]]; then
+            if [[ "${_CURRENT_MODE}" == "dev" ]]; then
+                MODE=prod
+            else
+                MODE=dev
+            fi
+        else
+            MODE="${_CURRENT_MODE}"
+        fi
+    else
+        # Non-interactive (called by automation) defaults to production mode.
+        MODE=prod
+    fi
 fi
 
 # ── prompt for WAN SSH if not specified and stdin is a terminal ───────────────
