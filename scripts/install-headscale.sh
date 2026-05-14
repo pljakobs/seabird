@@ -106,22 +106,26 @@ if [[ "${JOIN}" == "yes" ]]; then
     fi
 
     echo "Joining Headscale network..."
-    JOIN_CMD=(
-        tailscale up
-        --login-server="${LOGIN_SERVER}"
-        --authkey="${AUTH_KEY}"
-        --hostname="${NODE_HOSTNAME}"
-        --accept-routes=false
-        --accept-dns=true
-    )
-
+    # Pass auth key via environment variable, not CLI arg, to keep it out of
+    # the process table (visible via ps/top).
+    export TAILSCALE_AUTHKEY="${AUTH_KEY}"
     if command -v timeout &>/dev/null; then
-        timeout --preserve-status 120s "${JOIN_CMD[@]}"
+        timeout --preserve-status 120s \
+            tailscale up \
+            --login-server="${LOGIN_SERVER}" \
+            --hostname="${NODE_HOSTNAME}" \
+            --accept-routes=false \
+            --accept-dns=true
         JOIN_RC=$?
     else
-        "${JOIN_CMD[@]}"
+        tailscale up \
+            --login-server="${LOGIN_SERVER}" \
+            --hostname="${NODE_HOSTNAME}" \
+            --accept-routes=false \
+            --accept-dns=true
         JOIN_RC=$?
     fi
+    unset TAILSCALE_AUTHKEY
 
     if [[ ${JOIN_RC} -eq 124 ]]; then
         if tailscale status --self &>/dev/null; then

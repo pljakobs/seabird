@@ -130,7 +130,7 @@ fi
 
 # ── remaining env stubs (touch-only if missing) ───────────────────────────────
 
-for f in grafana.env pihole.env; do
+for f in grafana.env; do
     dest="/etc/seabird/${f}"
     if [[ ! -f "${dest}" ]]; then
         touch "${dest}"
@@ -139,10 +139,25 @@ for f in grafana.env pihole.env; do
     fi
 done
 
-# nextcloud.env is auto-generated above
+# ── pihole.env — auto-generate password on first install ─────────────────────
+PIHOLE_ENV="/etc/seabird/pihole.env"
+if [[ ! -f "${PIHOLE_ENV}" ]]; then
+    PIHOLE_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)"
+    printf 'WEBPASSWORD=%s\nTZ=UTC\n' "${PIHOLE_PASSWORD}" > "${PIHOLE_ENV}"
+    chmod 0600 "${PIHOLE_ENV}"
+    echo "  generated /etc/seabird/pihole.env with random password"
+    echo "  !! Save this credential — it is only shown once !!"
+    echo "    Pi-hole admin password : ${PIHOLE_PASSWORD}"
+elif [[ ! -s "${PIHOLE_ENV}" ]] || ! grep -q 'WEBPASSWORD=' "${PIHOLE_ENV}"; then
+    PIHOLE_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)"
+    echo "WEBPASSWORD=${PIHOLE_PASSWORD}" >> "${PIHOLE_ENV}"
+    chmod 0600 "${PIHOLE_ENV}"
+    echo "  added random WEBPASSWORD to existing ${PIHOLE_ENV}"
+    echo "  !! Save this credential — it is only shown once !!"
+    echo "    Pi-hole admin password : ${PIHOLE_PASSWORD}"
+fi
 
-echo "  For Pi-hole, set WEBPASSWORD and TZ in /etc/seabird/pihole.env"
-echo "  Example: echo 'WEBPASSWORD=yourpassword' >> /etc/seabird/pihole.env"
+# nextcloud.env is auto-generated above
 
 # ── disable systemd-resolved stub listener (Pi-hole needs port 53) ───────────
 

@@ -47,6 +47,14 @@ connectivity-change)
     PORTAL)
         PORTAL_URL="${CONNECTIVITY_CHECK_URL:-unknown}"
 
+        # Validate URL to prevent injection into the Caddy config snippet.
+        # Must be an absolute http:// or https:// URL with no newlines/special chars.
+        if [[ ! "${PORTAL_URL}" =~ ^https?://[A-Za-z0-9._~:/?#\[\]@!$\&\'()*+,;=%\-]+$ ]]; then
+            logger -t seabird-captive-portal \
+                "Captive portal URL failed validation — ignoring: ${PORTAL_URL}"
+            exit 0
+        fi
+
         logger -t seabird-captive-portal \
             "Captive portal detected on ${IFACE}: ${PORTAL_URL}"
 
