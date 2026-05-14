@@ -148,8 +148,9 @@ fi
 # ── install zone definitions ──────────────────────────────────────────────────
 
 echo "Installing zone definitions..."
-install -m 0644 "${ZONE_SRC}/wan.xml" /etc/firewalld/zones/wan.xml
-install -m 0644 "${ZONE_SRC}/lan.xml" /etc/firewalld/zones/lan.xml
+install -m 0644 "${ZONE_SRC}/wan.xml"     /etc/firewalld/zones/wan.xml
+install -m 0644 "${ZONE_SRC}/lan.xml"     /etc/firewalld/zones/lan.xml
+install -m 0644 "${ZONE_SRC}/headnet.xml" /etc/firewalld/zones/headnet.xml
 
 firewall-cmd --reload
 
@@ -204,6 +205,17 @@ echo "Configuring LAN zone..."
 for iface in "${_EFFECTIVE_LAN[@]}"; do
     _assign_zone "${iface}" lan
 done
+
+# ── Headnet zone: assign tailscale0 ──────────────────────────────────────────
+# tailscale0 is not managed by NetworkManager, so only firewall-cmd is needed.
+# The interface may not exist yet if tailscale hasn't run; --permanent is enough
+# — firewalld will apply the assignment when tailscale0 appears.
+echo "Configuring headnet zone (tailscale0)..."
+if firewall-cmd --permanent --zone=headnet --add-interface=tailscale0 2>/dev/null; then
+    echo "  tailscale0 -> headnet"
+else
+    echo "  tailscale0 -> headnet (already assigned or interface not yet present — will apply on next firewalld reload after tailscale starts)"
+fi
 
 # ── forwarding policy: lan → wan ──────────────────────────────────────────────
 # Requires firewalld >= 0.9.0 (Fedora 34+). Allows LAN clients to reach WAN.

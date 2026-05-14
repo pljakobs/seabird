@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  headnet zone — Tailscale/Headscale VPN interface (tailscale0)
+
+  Policy: ACCEPT — all tailnet peers are trusted (access controlled at the
+  Headscale server via ACLs). All seabird services are reachable on their
+  direct ports from the tailnet.
+  Interface assignment is done at install time via firewall-cmd.
+-->
+<zone target="ACCEPT">
+  <short>headnet</short>
+  <description>Tailscale/Headscale VPN network. Trusted peers only — all service ports open.</description>
+</zone>
