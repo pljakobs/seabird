@@ -14,6 +14,9 @@
 #   --allow-wan-ssh=yes   Open port 22 on the WAN zone, install fail2ban,
 #                         and disable SSH password authentication.
 #   --allow-wan-ssh=no    (default) SSH is only reachable from the LAN zone.
+#   --mode=prod           (default) end0 is WAN — fully firewalled upstream.
+#   --mode=dev            end0 joins the lan zone — all services reachable
+#                         from the upstream interface (for development/testing).
 #
 # Multi-WAN routing note:
 #   Firewalld handles the firewall and NAT. For opportunistic multi-WAN
@@ -25,6 +28,7 @@ set -euo pipefail
 WAN_INTERFACES=(wwan0 wlan0 end0)
 LAN_INTERFACES=(wlp6s0 enp4s0)
 ALLOW_WAN_SSH=""   # empty = not yet decided
+MODE="prod"        # prod|dev
 
 # ── argument parsing ──────────────────────────────────────────────────────────
 
@@ -37,6 +41,14 @@ while [[ $# -gt 0 ]]; do
                 ALLOW_WAN_SSH="$2"; shift 2
             else
                 echo "error: --allow-wan-ssh requires 'yes' or 'no'" >&2; exit 1
+            fi ;;
+        --mode=prod) MODE=prod; shift ;;
+        --mode=dev)  MODE=dev;  shift ;;
+        --mode)
+            if [[ "${2:-}" == "prod" || "${2:-}" == "dev" ]]; then
+                MODE="$2"; shift 2
+            else
+                echo "error: --mode requires 'prod' or 'dev'" >&2; exit 1
             fi ;;
         -h|--help)
             sed -n '/^# install-firewall/,/^[^#]/p' "$0" | grep '^#' | sed 's/^# \?//'
@@ -108,10 +120,21 @@ install -m 0644 "${ZONE_SRC}/lan.xml" /etc/firewalld/zones/lan.xml
 firewall-cmd --reload
 
 # ── WAN zone: assign interfaces ───────────────────────────────────────────────
+# In dev mode, end0 moves to lan so all services are reachable from the
+# upstream interface. In prod mode (default) end0 stays on wan.
+
+if [[ "${MODE}" == "dev" ]]; then
+    _EFFECTIVE_WAN=(wwan0 wlan0)
+    _EFFECTIVE_LAN=(wlp6s0 enp4s0 end0)
+    echo "Mode: dev — end0 placed in lan zone (services reachable from upstream)"
+else
+    _EFFECTIVE_WAN=("${WAN_INTERFACES[@]}")
+    _EFFECTIVE_LAN=("${LAN_INTERFACES[@]}")
+    echo "Mode: prod — end0 in wan zone (firewalled upstream)"
+fi
 
 echo "Configuring WAN zone..."
-for iface in "${WAN_INTERFACES[@]}"; do
-    # Remove from whatever zone it may already be in
+for iface in "${_EFFECTIVE_WAN[@]}"; do
     current_zone=$(firewall-cmd --get-zone-of-interface="${iface}" 2>/dev/null || true)
     if [[ -n "${current_zone}" && "${current_zone}" != "wan" ]]; then
         firewall-cmd --permanent --zone="${current_zone}" --remove-interface="${iface}" || true
@@ -123,7 +146,7 @@ done
 # ── LAN zone: assign interfaces ───────────────────────────────────────────────
 
 echo "Configuring LAN zone..."
-for iface in "${LAN_INTERFACES[@]}"; do
+for iface in "${_EFFECTIVE_LAN[@]}"; do
     current_zone=$(firewall-cmd --get-zone-of-interface="${iface}" 2>/dev/null || true)
     if [[ -n "${current_zone}" && "${current_zone}" != "lan" ]]; then
         firewall-cmd --permanent --zone="${current_zone}" --remove-interface="${iface}" || true
@@ -146,6 +169,48 @@ else
     firewall-cmd --permanent --policy=lan-to-wan --add-egress-zone=wan   2>/dev/null || true
     firewall-cmd --permanent --policy=lan-to-wan --set-target=ACCEPT     2>/dev/null || true
 fi
+
+# ── production hardening: block WAN -> Podman published ports ───────────────
+# Rootful Podman installs DNAT/forward rules for published ports. In prod mode
+# we explicitly drop forwarding from WAN interfaces to the Podman bridge so
+# container ports are not reachable from upstream links.
+_podman_block_rule_exists() {
+    local family="$1"
+    local iface="$2"
+    local bridge="$3"
+    firewall-cmd --permanent --direct --query-rule "${family}" filter FORWARD 0 -i "${iface}" -o "${bridge}" -j DROP &>/dev/null
+}
+
+_podman_block_rule_add() {
+    local family="$1"
+    local iface="$2"
+    local bridge="$3"
+    if ! _podman_block_rule_exists "${family}" "${iface}" "${bridge}"; then
+        firewall-cmd --permanent --direct --add-rule "${family}" filter FORWARD 0 -i "${iface}" -o "${bridge}" -j DROP
+    fi
+}
+
+_podman_block_rule_remove() {
+    local family="$1"
+    local iface="$2"
+    local bridge="$3"
+    if _podman_block_rule_exists "${family}" "${iface}" "${bridge}"; then
+        firewall-cmd --permanent --direct --remove-rule "${family}" filter FORWARD 0 -i "${iface}" -o "${bridge}" -j DROP
+    fi
+}
+
+echo "Configuring WAN access to Podman published ports..."
+for iface in "${WAN_INTERFACES[@]}"; do
+    if [[ "${MODE}" == "prod" ]]; then
+        _podman_block_rule_add ipv4 "${iface}" podman0
+        _podman_block_rule_add ipv6 "${iface}" podman0
+        echo "  ${iface} -> podman0 blocked (prod)"
+    else
+        _podman_block_rule_remove ipv4 "${iface}" podman0
+        _podman_block_rule_remove ipv6 "${iface}" podman0
+        echo "  ${iface} -> podman0 allowed (dev)"
+    fi
+done
 
 # ── enable IPv4/IPv6 forwarding ───────────────────────────────────────────────
 
