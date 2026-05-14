@@ -29,7 +29,8 @@
   }
 
   # Navidrome — sub-path aware (ND_BASEURL=/navidrome)
-  handle_path /navidrome* {
+  # Keep the /navidrome prefix when proxying to avoid redirect loops.
+  handle /navidrome* {
     reverse_proxy 127.0.0.1:4533
   }
 
