@@ -106,17 +106,43 @@ if [[ "${JOIN}" == "yes" ]]; then
     fi
 
     echo "Joining Headscale network..."
-    tailscale up \
-        --login-server="${LOGIN_SERVER}" \
-        --authkey="${AUTH_KEY}" \
-        --hostname="${NODE_HOSTNAME}" \
-        --accept-routes=true \
+    JOIN_CMD=(
+        tailscale up
+        --login-server="${LOGIN_SERVER}"
+        --authkey="${AUTH_KEY}"
+        --hostname="${NODE_HOSTNAME}"
+        --accept-routes=false
         --accept-dns=true
+    )
+
+    if command -v timeout &>/dev/null; then
+        timeout --preserve-status 120s "${JOIN_CMD[@]}"
+        JOIN_RC=$?
+    else
+        "${JOIN_CMD[@]}"
+        JOIN_RC=$?
+    fi
+
+    if [[ ${JOIN_RC} -eq 124 ]]; then
+        if tailscale status --self &>/dev/null; then
+            echo "  tailscale up timed out, but the node is already connected — treating as success"
+        else
+            echo "error: tailscale up timed out before the node connected" >&2
+            exit 1
+        fi
+    elif [[ ${JOIN_RC} -ne 0 ]]; then
+        if tailscale status --self &>/dev/null; then
+            echo "  tailscale up returned ${JOIN_RC}, but the node is already connected — treating as success"
+        else
+            echo "error: tailscale up failed with exit code ${JOIN_RC}" >&2
+            exit ${JOIN_RC}
+        fi
+    fi
 
     echo "Joined. Current Tailscale identity:"
     tailscale status --self || true
 else
     echo "Headscale join step skipped."
     echo "Join later with:"
-    echo "  tailscale up --login-server=<URL> --authkey=<KEY> --hostname=${NODE_HOSTNAME} --accept-routes=true --accept-dns=true"
+    echo "  tailscale up --login-server=<URL> --authkey=<KEY> --hostname=${NODE_HOSTNAME} --accept-routes=false --accept-dns=true"
 fi
