@@ -175,6 +175,33 @@ EOF
 systemctl restart systemd-resolved
 echo "  resolved stub listener disabled"
 
+# ── disable DNS on NM shared-mode dnsmasq (Pi-hole owns port 53) ─────────────
+# NM's shared mode on crew LAN / WiFi AP runs dnsmasq for DHCP.  Without this,
+# that dnsmasq binds port 53 on interface IPs and prevents pihole-FTL from
+# binding 0.0.0.0:53.  port=0 disables DNS while leaving DHCP intact; clients
+# still get the interface IP (e.g. 10.42.0.1) as their DNS server via DHCP,
+# and pihole answers those queries via 0.0.0.0:53.
+
+echo "Installing NM shared-mode dnsmasq DNS-disable config..."
+NM_DNSMASQ_DIR="/etc/NetworkManager/dnsmasq-shared.d"
+mkdir -p "${NM_DNSMASQ_DIR}"
+install -m 0644 "${SCRIPT_DIR}/../config/nm-dnsmasq-shared/10-no-dns.conf" \
+    "${NM_DNSMASQ_DIR}/10-no-dns.conf"
+echo "  ${NM_DNSMASQ_DIR}/10-no-dns.conf"
+
+# Bounce all shared-mode NM connections so dnsmasq reloads with the new config
+while IFS= read -r con; do
+    [[ -z "${con}" ]] && continue
+    method=$(nmcli -g ipv4.method con show "${con}" 2>/dev/null)
+    if [[ "${method}" == "shared" ]]; then
+        echo "  bouncing shared connection: ${con}"
+        nmcli con down "${con}" 2>/dev/null || true
+        sleep 1
+        nmcli con up "${con}" 2>/dev/null || true
+    fi
+done < <(nmcli -t -f NAME con show)
+echo "  NM shared-mode dnsmasq DNS disabled"
+
 # ── avahi mDNS service advertisements ───────────────────────────────────────
 
 echo "Installing avahi service advertisements..."
