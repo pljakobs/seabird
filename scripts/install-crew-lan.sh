@@ -13,6 +13,7 @@ set -euo pipefail
 LAN_IFACE="enp4s0"
 NM_CONN="Wired connection 2"
 LAN_IP="10.42.0.1/24"
+NM_DNSMASQ_CONF="/etc/NetworkManager/dnsmasq-shared.d/seabird-crew-lan.conf"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -48,6 +49,14 @@ nmcli con modify "${NM_CONN}" \
     ipv4.method shared \
     ipv4.addresses "${LAN_IP}" \
     ipv6.method ignore
+
+# NM shared mode runs dnsmasq; advertise Pi-hole as the DNS server so DHCP
+# clients pick it up automatically when the WAN/phone upstream disappears.
+mkdir -p /etc/NetworkManager/dnsmasq-shared.d
+cat > "${NM_DNSMASQ_CONF}" <<EOF
+# seabird crew LAN DHCP config — managed by install-crew-lan.sh, do not edit manually
+dhcp-option=6,${LAN_IP%%/*}
+EOF
 
 nmcli con up "${NM_CONN}"
 

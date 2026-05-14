@@ -65,6 +65,12 @@ fi
 echo "Enabling tailscaled..."
 systemctl enable --now tailscaled
 
+# Never accept DNS from Tailscale/Headscale. Pi-hole on Seabird is the only
+# DNS source we want on this network.
+if tailscale status --self &>/dev/null; then
+    tailscale set --accept-dns=false || true
+fi
+
 # Detect current connectivity once; used for skip/prompt behavior below.
 if tailscale status --self &>/dev/null; then
     CURRENT_JOINED=yes
@@ -115,14 +121,14 @@ if [[ "${JOIN}" == "yes" ]]; then
             --login-server="${LOGIN_SERVER}" \
             --hostname="${NODE_HOSTNAME}" \
             --accept-routes=false \
-            --accept-dns=true
+            --accept-dns=false
         JOIN_RC=$?
     else
         tailscale up \
             --login-server="${LOGIN_SERVER}" \
             --hostname="${NODE_HOSTNAME}" \
             --accept-routes=false \
-            --accept-dns=true
+            --accept-dns=false
         JOIN_RC=$?
     fi
     unset TAILSCALE_AUTHKEY
@@ -148,5 +154,5 @@ if [[ "${JOIN}" == "yes" ]]; then
 else
     echo "Headscale join step skipped."
     echo "Join later with:"
-    echo "  tailscale up --login-server=<URL> --authkey=<KEY> --hostname=${NODE_HOSTNAME} --accept-routes=false --accept-dns=true"
+    echo "  tailscale up --login-server=<URL> --authkey=<KEY> --hostname=${NODE_HOSTNAME} --accept-routes=false --accept-dns=false"
 fi
