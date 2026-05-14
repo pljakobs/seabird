@@ -167,26 +167,42 @@ else
     echo "Mode: prod — end0 in wan zone (firewalled upstream)"
 fi
 
-echo "Configuring WAN zone..."
-for iface in "${_EFFECTIVE_WAN[@]}"; do
+
+# Helper: assign iface to zone in both firewalld (permanent) AND the NM
+# connection profile. Without the NM step, NetworkManager overrides the
+# firewalld permanent zone whenever it brings the interface up, leaving it
+# in the system-default FedoraServer zone at runtime.
+_assign_zone() {
+    local iface="$1" zone="$2"
+    local current_zone
     current_zone=$(firewall-cmd --get-zone-of-interface="${iface}" 2>/dev/null || true)
-    if [[ -n "${current_zone}" && "${current_zone}" != "wan" ]]; then
+    if [[ -n "${current_zone}" && "${current_zone}" != "${zone}" ]]; then
         firewall-cmd --permanent --zone="${current_zone}" --remove-interface="${iface}" || true
     fi
-    firewall-cmd --permanent --zone=wan --add-interface="${iface}"
-    echo "  ${iface} -> wan"
+    firewall-cmd --permanent --zone="${zone}" --add-interface="${iface}"
+
+    # Sync the NM connection profile so the zone survives reconnects/reboots
+    local nm_con
+    nm_con=$(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | awk -F: -v dev="${iface}" '$2==dev{print $1}')
+    if [[ -n "${nm_con}" ]]; then
+        nmcli con modify "${nm_con}" connection.zone "${zone}" 2>/dev/null && \
+            echo "  ${iface} -> ${zone} (firewalld + NM connection '${nm_con}')" || \
+            echo "  ${iface} -> ${zone} (firewalld; NM modify failed — manual 'nmcli con modify \"${nm_con}\" connection.zone ${zone}' may be needed)"
+    else
+        echo "  ${iface} -> ${zone} (firewalld; no active NM connection found for interface)"
+    fi
+}
+
+echo "Configuring WAN zone..."
+for iface in "${_EFFECTIVE_WAN[@]}"; do
+    _assign_zone "${iface}" wan
 done
 
 # ── LAN zone: assign interfaces ───────────────────────────────────────────────
 
 echo "Configuring LAN zone..."
 for iface in "${_EFFECTIVE_LAN[@]}"; do
-    current_zone=$(firewall-cmd --get-zone-of-interface="${iface}" 2>/dev/null || true)
-    if [[ -n "${current_zone}" && "${current_zone}" != "lan" ]]; then
-        firewall-cmd --permanent --zone="${current_zone}" --remove-interface="${iface}" || true
-    fi
-    firewall-cmd --permanent --zone=lan --add-interface="${iface}"
-    echo "  ${iface} -> lan"
+    _assign_zone "${iface}" lan
 done
 
 # ── forwarding policy: lan → wan ──────────────────────────────────────────────
