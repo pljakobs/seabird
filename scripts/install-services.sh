@@ -88,6 +88,11 @@ done
 echo "Creating /etc/seabird env stubs..."
 mkdir -p /etc/seabird
 
+# ── runtime state dir (/run/seabird) via tmpfiles.d ──────────────────────────
+# The caddy container mounts /run/seabird; it must exist before caddy starts.
+install -m 0644 config/tmpfiles.d/seabird.conf /etc/tmpfiles.d/seabird.conf
+systemd-tmpfiles --create /etc/tmpfiles.d/seabird.conf
+
 # ── influxdb.env — auto-generate secrets on first install ────────────────────
 
 INFLUXDB_ENV="/etc/seabird/influxdb.env"
