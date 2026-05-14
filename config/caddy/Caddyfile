@@ -7,8 +7,8 @@
     admin off
 }
 
-# Landing page — links to management services
-http://seabird.local {
+# Landing page — links to management services and path-based service entrypoints
+:80 {
     handle /api/portal-status {
         # Serve captive-portal.json if present; 404 otherwise.
         # /run/seabird is bind-mounted into the container.
@@ -22,6 +22,22 @@ http://seabird.local {
         # portal is active. Returns 503 otherwise so crew gets a clear message.
         respond "No captive portal active." 503
     }
+
+  # Grafana — sub-path aware (GF_SERVER_SERVE_FROM_SUB_PATH=true)
+  handle_path /grafana* {
+    reverse_proxy 127.0.0.1:3001
+  }
+
+  # Navidrome — sub-path aware (ND_BASEURL=/navidrome)
+  handle_path /navidrome* {
+    reverse_proxy 127.0.0.1:4533
+  }
+
+  # Pi-hole — strip prefix before forwarding
+  handle_path /pihole* {
+    uri strip_prefix /pihole
+    reverse_proxy 127.0.0.1:3003
+  }
 
     handle {
         respond `<!DOCTYPE html>
@@ -40,11 +56,13 @@ a{display:block;padding:.5rem 0;font-size:1.1rem}
   &#9888; Marina WiFi requires login &mdash;
   <a href="/portal/">Authenticate now</a>
 </div>
+<a href="/grafana">&#128200; Grafana</a>
+<a href="/navidrome">&#127925; Music (Navidrome)</a>
+<a href="/pihole/admin">&#128274; Pi-hole DNS</a>
 <a href="http://seabird.local:3000">&#127908; Signal-K</a>
-<a href="http://seabird.local:3001">&#128200; Grafana</a>
-<a href="http://seabird.local:8086">&#128200; InfluxDB</a>
-<a href="http://seabird.local:3003/admin">&#128274; Pi-hole DNS</a>
-<a href="http://seabird.local:4533">&#127925; Music (Navidrome)</a>
+<a href="http://seabird.local:8086">&#128187; InfluxDB</a>
+<a href="http://seabird.local:8080">&#9729;&#65039; Nextcloud</a>
+<a href="http://seabird.local:3002">&#127968; Dashboard</a>
 <a href="http://seabird.local:9090">&#9881;&#65039; Admin (Cockpit)</a>
 <script>
 // Show portal banner if /run/seabird/captive-portal.json exists (via status API)

@@ -22,6 +22,7 @@ Volume=/srv/seabird/music:/music:ro,z
 Environment=ND_MUSICFOLDER=/music
 Environment=ND_DATAFOLDER=/data
 Environment=ND_LOGLEVEL=info
+Environment=ND_BASEURL=/navidrome
 Environment=ND_SESSIONTIMEOUT=24h
 # Run as root so it can write to Z-labeled volume
 User=root

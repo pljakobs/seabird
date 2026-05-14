@@ -20,7 +20,8 @@ Volume=/srv/seabird/grafana:/var/lib/grafana:Z
 # (Grafana image defaults to uid 472 — override for simplicity on this appliance)
 User=root
 
-Environment=GF_SERVER_ROOT_URL=http://seabird.local:3001
+Environment=GF_SERVER_ROOT_URL=http://seabird.local/grafana/
+Environment=GF_SERVER_SERVE_FROM_SUB_PATH=true
 Environment=GF_AUTH_ANONYMOUS_ENABLED=true
 Environment=GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
 Environment=GF_SECURITY_ALLOW_EMBEDDING=true
