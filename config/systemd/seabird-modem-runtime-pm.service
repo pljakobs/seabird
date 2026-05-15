@@ -1,0 +1,12 @@
+[Unit]
+Description=Pin Foxconn T99W175 runtime PM to on
+DefaultDependencies=no
+After=systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/seabird-pin-modem-runtime-pm
+
+[Install]
+WantedBy=multi-user.target

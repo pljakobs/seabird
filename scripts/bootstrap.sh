@@ -36,6 +36,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 MODEM_UDEV_RULE_SRC="${REPO_ROOT}/config/udev/99-seabird-foxconn-x55-power.rules"
+MODEM_PM_SERVICE_SRC="${REPO_ROOT}/config/systemd/seabird-modem-runtime-pm.service"
+MODEM_PM_HELPER_SRC="${REPO_ROOT}/scripts/pin-modem-runtime-pm.sh"
 
 NVME_DEVICE="/dev/nvme0n1"
 SET_HOSTNAME=true
@@ -137,7 +139,13 @@ section "3/7  X55 runtime PM fix"
 if [[ -f "${MODEM_UDEV_RULE_SRC}" ]]; then
     install -D -m 0644 "${MODEM_UDEV_RULE_SRC}" \
         /etc/udev/rules.d/99-seabird-foxconn-x55-power.rules
+    install -D -m 0755 "${MODEM_PM_HELPER_SRC}" \
+        /usr/local/sbin/seabird-pin-modem-runtime-pm
+    install -D -m 0644 "${MODEM_PM_SERVICE_SRC}" \
+        /etc/systemd/system/seabird-modem-runtime-pm.service
     udevadm control --reload-rules
+    systemctl daemon-reload
+    systemctl enable --now seabird-modem-runtime-pm.service
 
     _MODEM_PM_APPLIED=false
     for dev in /sys/bus/pci/devices/*; do

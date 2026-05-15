@@ -195,9 +195,24 @@ _assign_zone() {
         nm_con=$(nmcli -t -f NAME,TYPE con show 2>/dev/null | awk -F: '$2=="gsm"{print $1; exit}')
     fi
     if [[ -n "${nm_con}" ]]; then
-        nmcli con modify "${nm_con}" connection.zone "${zone}" 2>/dev/null && \
-            echo "  ${iface} -> ${zone} (firewalld + NM connection '${nm_con}')" || \
-            echo "  ${iface} -> ${zone} (firewalld; NM modify failed — manual 'nmcli con modify \"${nm_con}\" connection.zone ${zone}' may be needed)"
+        local route_metric=""
+        local metric_note=""
+        local modify_args=(connection.zone "${zone}")
+
+        case "${iface}" in
+            end0)  route_metric=100 ;;
+            wlan0) route_metric=200 ;;
+            wwan0) route_metric=50000 ;;
+        esac
+
+        if [[ -n "${route_metric}" ]]; then
+            modify_args+=(ipv4.route-metric "${route_metric}" ipv6.route-metric "${route_metric}")
+            metric_note=", route metric ${route_metric}"
+        fi
+
+        nmcli con modify "${nm_con}" "${modify_args[@]}" 2>/dev/null && \
+            echo "  ${iface} -> ${zone}${metric_note} (firewalld + NM connection '${nm_con}')" || \
+            echo "  ${iface} -> ${zone} (firewalld; NM modify failed — manual updates to '${nm_con}' may be needed)"
     else
         echo "  ${iface} -> ${zone} (firewalld; no active NM connection found for interface)"
     fi
