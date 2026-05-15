@@ -16,10 +16,12 @@ Pull=missing
 PublishPort=3000:3000
 
 # Persistent data — plugin config, vessel data, log files
-Volume=/srv/seabird/signalk:/home/node/.signalk:Z
+# SignalK stores runtime state under /home/node/.signalk
+Volume=/srv/seabird/signalk:/home/node/.signalk
 
-# Run as root so it can write to the root-owned Z-labeled volume
-User=root
+# Disable SELinux labeling — btrfs subvolume relabeling (:z/:Z) doesn't work
+# reliably; host dir is already labeled container_file_t which is sufficient
+SecurityLabelDisable=true
 
 # Signal-K needs to know the vessel MMSI/name — configure via
 # /srv/seabird/signalk/settings.json on first start or via the web UI

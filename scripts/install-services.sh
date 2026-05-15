@@ -70,6 +70,10 @@ for d in "${dirs[@]}"; do
     echo "  ${d}"
 done
 
+# SignalK runs as uid/gid 1000 (node) and needs write access for plugins/state.
+chown -R 1000:1000 /srv/seabird/signalk
+chmod 0755 /srv/seabird/signalk
+
 # ── install homepage default config (if not already present) ─────────────────
 
 echo "Installing Homepage default config..."
