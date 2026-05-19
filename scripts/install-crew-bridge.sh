@@ -226,8 +226,8 @@ rm -f /etc/NetworkManager/dnsmasq-shared.d/seabird-ap.conf
 cat > "${SEABIRD_BRIDGE_CONF}" <<EOF
 # seabird crew LAN bridge DHCP config — managed by install-crew-bridge.sh, do not edit manually
 dhcp-range=${DHCP_START},${DHCP_END},12h
-# Tell DHCP clients to use pihole for DNS
-dhcp-option=6,${PIHOLE_IP}
+# Tell DHCP clients to use Pi-hole first, with Quad9 as fallback
+dhcp-option=6,${PIHOLE_IP},9.9.9.9
 EOF
 echo "  DHCP and DNS configured."
 

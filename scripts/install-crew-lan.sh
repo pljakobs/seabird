@@ -50,12 +50,12 @@ nmcli con modify "${NM_CONN}" \
     ipv4.addresses "${LAN_IP}" \
     ipv6.method ignore
 
-# NM shared mode runs dnsmasq; advertise Pi-hole as the DNS server so DHCP
-# clients pick it up automatically when the WAN/phone upstream disappears.
+# NM shared mode runs dnsmasq; advertise Pi-hole as primary DNS with Quad9
+# fallback so clients keep resolving if Pi-hole is down.
 mkdir -p /etc/NetworkManager/dnsmasq-shared.d
 cat > "${NM_DNSMASQ_CONF}" <<EOF
 # seabird crew LAN DHCP config — managed by install-crew-lan.sh, do not edit manually
-dhcp-option=6,${LAN_IP%%/*}
+dhcp-option=6,${LAN_IP%%/*},9.9.9.9
 EOF
 
 nmcli con up "${NM_CONN}"

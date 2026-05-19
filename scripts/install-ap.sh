@@ -157,8 +157,8 @@ AP_ADDR="${AP_IP%%/*}"   # strip prefix length, e.g. 192.168.42.1 from 192.168.4
 cat > "${SEABIRD_AP_CONF}" <<EOF
 # seabird AP DHCP config — managed by install-ap.sh, do not edit manually
 dhcp-range=${DHCP_START},${DHCP_END},12h
-# Hand out Pi-hole (running on this box) as the DNS server for all DHCP clients
-dhcp-option=6,${AP_ADDR}
+# Hand out Pi-hole as primary DNS, with Quad9 fallback if Pi-hole is unavailable
+dhcp-option=6,${AP_ADDR},9.9.9.9
 EOF
 echo "  DHCP range and DNS configured in ${SEABIRD_AP_CONF}"
 
