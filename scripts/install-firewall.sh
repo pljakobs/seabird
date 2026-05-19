@@ -189,7 +189,9 @@ _assign_zone() {
     local nm_con
     nm_con=$(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | awk -F: -v dev="${iface}" '$2==dev{print $1; exit}')
     if [[ -z "${nm_con}" ]]; then
-        nm_con=$(nmcli -t -f NAME,connection.interface-name con show 2>/dev/null | awk -F: -v dev="${iface}" '$2==dev{print $1; exit}')
+        # Some NM versions do not support connection.interface-name in this view;
+        # NAME,DEVICE is widely supported and reports '--' for inactive profiles.
+        nm_con=$(nmcli -t -f NAME,DEVICE con show 2>/dev/null | awk -F: -v dev="${iface}" '$2==dev{print $1; exit}')
     fi
     if [[ -z "${nm_con}" && "${iface}" =~ ^wwan[0-9]+$ ]]; then
         nm_con=$(nmcli -t -f NAME,TYPE con show 2>/dev/null | awk -F: '$2=="gsm"{print $1; exit}')
