@@ -36,6 +36,26 @@ PASSWORD=""
 BRIDGE_IP=""
 PIHOLE_IP=""  # pihole DNS server (defaults to bridge IP; pihole listens on 0.0.0.0:53)
 BAND="bg"
+SUCCESS=0
+
+OLD_AP_CONN="$(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | awk -F: -v dev="${AP_IFACE}" '$2==dev{print $1; exit}')"
+OLD_WIRED_CONN="$(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | awk -F: -v dev="${WIRED_IFACE}" '$2==dev{print $1; exit}')"
+
+_rollback_on_error() {
+    local rc=$?
+    if [[ ${rc} -ne 0 && ${SUCCESS} -eq 0 ]]; then
+        echo
+        echo "error: bridge setup failed; attempting rollback of previous links..." >&2
+        if [[ -n "${OLD_AP_CONN}" ]]; then
+            nmcli con up "${OLD_AP_CONN}" 2>/dev/null || true
+        fi
+        if [[ -n "${OLD_WIRED_CONN}" ]]; then
+            nmcli con up "${OLD_WIRED_CONN}" 2>/dev/null || true
+        fi
+        echo "rollback attempted. verify with: nmcli device status" >&2
+    fi
+}
+trap _rollback_on_error EXIT
 
 # ── argument parsing ──────────────────────────────────────────────────────────
 
@@ -145,7 +165,7 @@ nmcli con add \
     ifname "${AP_IFACE}" \
     con-name "${NM_AP_CONN}" \
     ssid "${SSID}" \
-    mode ap 2>/dev/null || true
+    mode ap
 
 nmcli con modify "${NM_AP_CONN}" \
     connection.zone lan \
@@ -172,7 +192,7 @@ fi
 nmcli con add \
     type ethernet \
     ifname "${WIRED_IFACE}" \
-    con-name "${NM_WIRED_CONN}" 2>/dev/null || true
+    con-name "${NM_WIRED_CONN}"
 
 nmcli con modify "${NM_WIRED_CONN}" \
     connection.zone lan \
@@ -204,7 +224,7 @@ fi
 nmcli con add \
     type ethernet \
     ifname "${BRIDGE_NAME}" \
-    con-name "${NM_BRIDGE_CONN}" 2>/dev/null || true
+    con-name "${NM_BRIDGE_CONN}"
 
 nmcli con modify "${NM_BRIDGE_CONN}" \
     connection.zone lan \
@@ -248,14 +268,13 @@ else
     echo "  Note: /srv/seabird/pihole not yet; skipping seabird.local entry."
 fi
 
-# ── step 8: clean up old connections ────────────────────────────────────────
+# ── step 8: legacy profile cleanup (safe) ───────────────────────────────────
 
-echo "Step 8: Removing old individual LAN connections..."
-for old_conn in "seabird-ap" "Wired connection 2" "seabird-wired-member"; do
+echo "Step 8: Cleaning legacy profiles (safe mode)..."
+for old_conn in "Wired connection 2" "Wired connection 1"; do
     if nmcli con show "${old_conn}" &>/dev/null; then
-        nmcli con down "${old_conn}" 2>/dev/null || true
-        nmcli con delete "${old_conn}" 2>/dev/null || true
-        echo "  Removed '${old_conn}'."
+        nmcli con modify "${old_conn}" connection.autoconnect no 2>/dev/null || true
+        echo "  Left '${old_conn}' in place as fallback (autoconnect disabled)."
     fi
 done
 
@@ -269,3 +288,4 @@ echo "  DHCP range       : ${DHCP_START} – ${DHCP_END}"
 echo "  DNS server       : ${PIHOLE_IP}"
 echo
 echo "Verify connectivity with: ip addr show ${BRIDGE_NAME}"
+SUCCESS=1
