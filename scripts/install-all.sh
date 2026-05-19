@@ -8,6 +8,7 @@
 #   sudo scripts/install-all.sh [--nvme-device DEV] [--hostname NAME|--no-hostname]
 #                               [--allow-wan-ssh=yes|no] [--mode=prod|dev]
 #                               [--batch-network]
+#                               [--background]
 #                               [--crew-ssid NAME] [--crew-password PSK]
 #                               [--crew-ip ADDR/PREFIX] [--crew-band bg|a]
 #                               [--crew-pihole-ip IP]
@@ -22,6 +23,8 @@
 #   --mode=prod|dev          Firewall mode for install-firewall.sh (default: prod)
 #   --batch-network          Ask all network questions first, then run network
 #                            setup scripts non-interactively with those answers
+#   --background             Re-exec install-all in background and log to
+#                            /var/log/seabird/install-all-<timestamp>.log
 #   --crew-ssid NAME         WiFi AP SSID passed to install-crew-bridge.sh
 #   --crew-password PSK      WiFi AP WPA2 password passed to install-crew-bridge.sh
 #   --crew-ip ADDR/PREFIX    Crew bridge IP/prefix (default: 192.168.42.1/24)
@@ -55,6 +58,7 @@ SKIP_AP=false
 SKIP_SERVICES=false
 SKIP_HEADSCALE=false
 BATCH_NETWORK=false
+BACKGROUND=false
 ALLOW_WAN_SSH=""   # empty = let install-firewall.sh prompt
 FIREWALL_MODE=""   # empty = let install-firewall.sh default to prod
 CREW_SSID=""
@@ -65,6 +69,7 @@ CREW_PIHOLE_IP=""
 HEADSCALE_JOIN=""            # empty = let install-headscale.sh prompt
 HEADSCALE_LOGIN_SERVER=""
 HEADSCALE_AUTH_KEY=""
+RAW_ARGS=("$@")
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -77,6 +82,7 @@ while [[ $# -gt 0 ]]; do
         --skip-services)     SKIP_SERVICES=true; shift ;;
         --skip-headscale)    SKIP_HEADSCALE=true; shift ;;
         --batch-network)     BATCH_NETWORK=true; shift ;;
+        --background)        BACKGROUND=true; shift ;;
         --allow-wan-ssh=yes) ALLOW_WAN_SSH=yes; shift ;;
         --allow-wan-ssh=no)  ALLOW_WAN_SSH=no;  shift ;;
         --crew-ssid)         CREW_SSID="${2:-}"; shift 2 ;;
@@ -252,6 +258,41 @@ if [[ "${BATCH_NETWORK}" == true ]]; then
         echo "Aborted by user."
         exit 1
     fi
+fi
+
+if [[ "${BACKGROUND}" == true && "${SEABIRD_INSTALL_ALL_DETACHED:-0}" != "1" ]]; then
+    LOG_DIR="/var/log/seabird"
+    TS="$(date +%Y%m%d-%H%M%S)"
+    LOG_FILE="${LOG_DIR}/install-all-${TS}.log"
+    mkdir -p "${LOG_DIR}"
+
+    FORWARD_ARGS=()
+    [[ "${SET_HOSTNAME}" == false ]] && FORWARD_ARGS+=(--no-hostname)
+    [[ "${SKIP_STORAGE}" == true ]] && FORWARD_ARGS+=(--skip-storage)
+    [[ "${SKIP_FIREWALL}" == true ]] && FORWARD_ARGS+=(--skip-firewall)
+    [[ "${SKIP_AP}" == true ]] && FORWARD_ARGS+=(--skip-ap)
+    [[ "${SKIP_SERVICES}" == true ]] && FORWARD_ARGS+=(--skip-services)
+    [[ "${SKIP_HEADSCALE}" == true ]] && FORWARD_ARGS+=(--skip-headscale)
+    [[ -n "${NVME_DEVICE}" ]] && FORWARD_ARGS+=(--nvme-device "${NVME_DEVICE}")
+    [[ "${SET_HOSTNAME}" == true ]] && FORWARD_ARGS+=(--hostname "${TARGET_HOSTNAME}")
+    [[ -n "${ALLOW_WAN_SSH}" ]] && FORWARD_ARGS+=(--allow-wan-ssh="${ALLOW_WAN_SSH}")
+    [[ -n "${FIREWALL_MODE}" ]] && FORWARD_ARGS+=(--mode "${FIREWALL_MODE}")
+    [[ -n "${CREW_SSID}" ]] && FORWARD_ARGS+=(--crew-ssid "${CREW_SSID}")
+    [[ -n "${CREW_PASSWORD}" ]] && FORWARD_ARGS+=(--crew-password "${CREW_PASSWORD}")
+    [[ -n "${CREW_IP}" ]] && FORWARD_ARGS+=(--crew-ip "${CREW_IP}")
+    [[ -n "${CREW_BAND}" ]] && FORWARD_ARGS+=(--crew-band "${CREW_BAND}")
+    [[ -n "${CREW_PIHOLE_IP}" ]] && FORWARD_ARGS+=(--crew-pihole-ip "${CREW_PIHOLE_IP}")
+    [[ -n "${HEADSCALE_JOIN}" ]] && FORWARD_ARGS+=(--headscale-join="${HEADSCALE_JOIN}")
+    [[ -n "${HEADSCALE_LOGIN_SERVER}" ]] && FORWARD_ARGS+=(--headscale-login-server "${HEADSCALE_LOGIN_SERVER}")
+    [[ -n "${HEADSCALE_AUTH_KEY}" ]] && FORWARD_ARGS+=(--headscale-auth-key "${HEADSCALE_AUTH_KEY}")
+
+    echo "Starting install-all in background..."
+    echo "  Log file: ${LOG_FILE}"
+    echo "  Follow:   tail -f ${LOG_FILE}"
+
+    SEABIRD_INSTALL_ALL_DETACHED=1 nohup "$0" "${FORWARD_ARGS[@]}" >"${LOG_FILE}" 2>&1 < /dev/null &
+    echo "  PID: $!"
+    exit 0
 fi
 
 section() { echo; echo "══════════════════════════════════════════"; echo "  $*"; echo "══════════════════════════════════════════"; }
