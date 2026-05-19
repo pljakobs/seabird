@@ -144,14 +144,23 @@ fi
 
 # ── 4. Wired crew LAN + WiFi access point ────────────────────────────────────
 
-section "4/7  Wired crew LAN + WiFi access point"
-echo "  configuring wired crew LAN..."
-bash "${SCRIPT_DIR}/install-crew-lan.sh"
-
-if [[ "${SKIP_AP}" == true ]]; then
-    echo "  skipping (--skip-ap)"
+section "4/7  Crew LAN + WiFi access point"
+if [[ -x "${SCRIPT_DIR}/install-crew-bridge.sh" ]]; then
+    if [[ "${SKIP_AP}" == true ]]; then
+        echo "  skipping (--skip-ap)"
+    else
+        echo "  configuring unified crew LAN bridge (wired + AP)..."
+        bash "${SCRIPT_DIR}/install-crew-bridge.sh"
+    fi
 else
-    bash "${SCRIPT_DIR}/install-ap.sh"
+    echo "  configuring wired crew LAN..."
+    bash "${SCRIPT_DIR}/install-crew-lan.sh"
+
+    if [[ "${SKIP_AP}" == true ]]; then
+        echo "  skipping (--skip-ap)"
+    else
+        bash "${SCRIPT_DIR}/install-ap.sh"
+    fi
 fi
 
 # ── 5. Service quadlets ───────────────────────────────────────────────────────

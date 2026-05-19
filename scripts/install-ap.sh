@@ -71,8 +71,13 @@ fi
 # ── interactive prompts for anything not supplied on command line ─────────────
 
 if [[ -z "${SSID}" ]]; then
-    read -r -p "AP SSID [SeaBird]: " SSID
-    SSID="${SSID:-SeaBird}"
+    while true; do
+        read -r -p "AP SSID: " SSID
+        if [[ -n "${SSID}" ]]; then
+            break
+        fi
+        echo "SSID must not be empty."
+    done
 fi
 
 if [[ -z "${PASSWORD}" ]]; then
