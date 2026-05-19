@@ -7,6 +7,10 @@
 # Usage:
 #   sudo scripts/install-all.sh [--nvme-device DEV] [--hostname NAME|--no-hostname]
 #                               [--allow-wan-ssh=yes|no] [--mode=prod|dev]
+#                               [--batch-network]
+#                               [--crew-ssid NAME] [--crew-password PSK]
+#                               [--crew-ip ADDR/PREFIX] [--crew-band bg|a]
+#                               [--crew-pihole-ip IP]
 #                               [--headscale-join=yes|no] [--headscale-login-server URL]
 #                               [--headscale-auth-key KEY] [--skip-headscale]
 #
@@ -16,6 +20,13 @@
 #   --no-hostname            Skip hostname configuration
 #   --allow-wan-ssh=yes|no   Open SSH on WAN zone with fail2ban (default: no)
 #   --mode=prod|dev          Firewall mode for install-firewall.sh (default: prod)
+#   --batch-network          Ask all network questions first, then run network
+#                            setup scripts non-interactively with those answers
+#   --crew-ssid NAME         WiFi AP SSID passed to install-crew-bridge.sh
+#   --crew-password PSK      WiFi AP WPA2 password passed to install-crew-bridge.sh
+#   --crew-ip ADDR/PREFIX    Crew bridge IP/prefix (default: 192.168.42.1/24)
+#   --crew-band bg|a         Crew AP band: bg (2.4 GHz) or a (5 GHz)
+#   --crew-pihole-ip IP      DNS IP advertised to DHCP clients (default: crew IP)
 #   --headscale-join=yes|no  Join Headscale network during install (default: prompt)
 #   --headscale-login-server Headscale control URL for tailscale up
 #   --headscale-auth-key     Headscale preauth key for this node
@@ -43,8 +54,14 @@ SKIP_FIREWALL=false
 SKIP_AP=false
 SKIP_SERVICES=false
 SKIP_HEADSCALE=false
+BATCH_NETWORK=false
 ALLOW_WAN_SSH=""   # empty = let install-firewall.sh prompt
 FIREWALL_MODE=""   # empty = let install-firewall.sh default to prod
+CREW_SSID=""
+CREW_PASSWORD=""
+CREW_IP=""
+CREW_BAND=""
+CREW_PIHOLE_IP=""
 HEADSCALE_JOIN=""            # empty = let install-headscale.sh prompt
 HEADSCALE_LOGIN_SERVER=""
 HEADSCALE_AUTH_KEY=""
@@ -59,8 +76,14 @@ while [[ $# -gt 0 ]]; do
         --skip-ap)           SKIP_AP=true; shift ;;
         --skip-services)     SKIP_SERVICES=true; shift ;;
         --skip-headscale)    SKIP_HEADSCALE=true; shift ;;
+        --batch-network)     BATCH_NETWORK=true; shift ;;
         --allow-wan-ssh=yes) ALLOW_WAN_SSH=yes; shift ;;
         --allow-wan-ssh=no)  ALLOW_WAN_SSH=no;  shift ;;
+        --crew-ssid)         CREW_SSID="${2:-}"; shift 2 ;;
+        --crew-password)     CREW_PASSWORD="${2:-}"; shift 2 ;;
+        --crew-ip)           CREW_IP="${2:-}"; shift 2 ;;
+        --crew-band)         CREW_BAND="${2:-}"; shift 2 ;;
+        --crew-pihole-ip)    CREW_PIHOLE_IP="${2:-}"; shift 2 ;;
         --allow-wan-ssh)
             if [[ "${2:-}" == "yes" || "${2:-}" == "no" ]]; then
                 ALLOW_WAN_SSH="$2"; shift 2
@@ -104,6 +127,117 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+if [[ -n "${CREW_BAND}" && "${CREW_BAND}" != "bg" && "${CREW_BAND}" != "a" ]]; then
+    echo "error: --crew-band must be 'bg' or 'a'" >&2
+    exit 1
+fi
+
+if [[ -n "${CREW_IP}" && ! "${CREW_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$ ]]; then
+    echo "error: --crew-ip must be in ADDR/PREFIX format (e.g. 192.168.42.1/24)" >&2
+    exit 1
+fi
+
+if [[ "${BATCH_NETWORK}" == true ]]; then
+    if [[ ! -t 0 ]]; then
+        echo "error: --batch-network requires an interactive terminal" >&2
+        exit 1
+    fi
+
+    echo
+    echo "Network batch preflight"
+    echo "Answer once now; network steps will run non-interactively afterward."
+
+    if [[ "${SKIP_FIREWALL}" != true ]]; then
+        if [[ -z "${FIREWALL_MODE}" ]]; then
+            read -r -p "Firewall mode [prod/dev] (default: prod): " FIREWALL_MODE
+            FIREWALL_MODE="${FIREWALL_MODE:-prod}"
+        fi
+        while [[ "${FIREWALL_MODE}" != "prod" && "${FIREWALL_MODE}" != "dev" ]]; do
+            read -r -p "Please enter firewall mode [prod/dev]: " FIREWALL_MODE
+        done
+
+        if [[ -z "${ALLOW_WAN_SSH}" ]]; then
+            read -r -p "Allow SSH on WAN? [yes/no] (default: no): " ALLOW_WAN_SSH
+            ALLOW_WAN_SSH="${ALLOW_WAN_SSH:-no}"
+        fi
+        while [[ "${ALLOW_WAN_SSH}" != "yes" && "${ALLOW_WAN_SSH}" != "no" ]]; do
+            read -r -p "Please enter allow WAN SSH [yes/no]: " ALLOW_WAN_SSH
+        done
+    fi
+
+    if [[ "${SKIP_AP}" != true ]]; then
+        if [[ -z "${CREW_SSID}" ]]; then
+            while true; do
+                read -r -p "Crew AP SSID: " CREW_SSID
+                [[ -n "${CREW_SSID}" ]] && break
+                echo "SSID must not be empty."
+            done
+        fi
+
+        if [[ -z "${CREW_PASSWORD}" ]]; then
+            while true; do
+                read -r -s -p "Crew AP WPA2 password (min 8 chars): " CREW_PASSWORD
+                echo
+                if [[ ${#CREW_PASSWORD} -lt 8 ]]; then
+                    echo "Password must be at least 8 characters."
+                    continue
+                fi
+                read -r -s -p "Confirm password: " _CREW_PASSWORD2
+                echo
+                if [[ "${CREW_PASSWORD}" == "${_CREW_PASSWORD2}" ]]; then
+                    break
+                fi
+                echo "Passwords do not match — try again."
+            done
+        fi
+
+        if [[ -z "${CREW_IP}" ]]; then
+            read -r -p "Crew bridge IP/prefix (default: 192.168.42.1/24): " CREW_IP
+            CREW_IP="${CREW_IP:-192.168.42.1/24}"
+        fi
+        while ! [[ "${CREW_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$ ]]; do
+            read -r -p "Please enter valid crew IP/prefix (e.g. 192.168.42.1/24): " CREW_IP
+        done
+
+        if [[ -z "${CREW_BAND}" ]]; then
+            read -r -p "Crew AP band [bg/a] (default: bg): " CREW_BAND
+            CREW_BAND="${CREW_BAND:-bg}"
+        fi
+        while [[ "${CREW_BAND}" != "bg" && "${CREW_BAND}" != "a" ]]; do
+            read -r -p "Please enter AP band [bg/a]: " CREW_BAND
+        done
+
+        if [[ -z "${CREW_PIHOLE_IP}" ]]; then
+            read -r -p "Crew DNS (Pi-hole) IP (default: crew bridge IP): " CREW_PIHOLE_IP
+            CREW_PIHOLE_IP="${CREW_PIHOLE_IP:-${CREW_IP%%/*}}"
+        fi
+    fi
+
+    echo
+    echo "Network preflight summary"
+    if [[ "${SKIP_FIREWALL}" != true ]]; then
+        echo "  Firewall mode   : ${FIREWALL_MODE}"
+        echo "  Allow WAN SSH   : ${ALLOW_WAN_SSH}"
+    else
+        echo "  Firewall        : skipped"
+    fi
+    if [[ "${SKIP_AP}" != true ]]; then
+        echo "  Crew SSID       : ${CREW_SSID}"
+        echo "  Crew password   : [set]"
+        echo "  Crew bridge IP  : ${CREW_IP}"
+        echo "  Crew AP band    : ${CREW_BAND}"
+        echo "  Crew DNS IP     : ${CREW_PIHOLE_IP}"
+    else
+        echo "  Crew AP         : skipped"
+    fi
+
+    read -r -p "Proceed with these network settings? [y/N]: " _BATCH_CONFIRM
+    if [[ ! "${_BATCH_CONFIRM}" =~ ^[Yy]$ ]]; then
+        echo "Aborted by user."
+        exit 1
+    fi
+fi
+
 section() { echo; echo "══════════════════════════════════════════"; echo "  $*"; echo "══════════════════════════════════════════"; }
 
 # ── 1. Hostname ───────────────────────────────────────────────────────────────
@@ -145,12 +279,18 @@ fi
 # ── 4. Wired crew LAN + WiFi access point ────────────────────────────────────
 
 section "4/7  Crew LAN + WiFi access point"
-if [[ -x "${SCRIPT_DIR}/install-crew-bridge.sh" ]]; then
+if [[ -f "${SCRIPT_DIR}/install-crew-bridge.sh" ]]; then
     if [[ "${SKIP_AP}" == true ]]; then
         echo "  skipping (--skip-ap)"
     else
         echo "  configuring unified crew LAN bridge (wired + AP)..."
-        bash "${SCRIPT_DIR}/install-crew-bridge.sh"
+        BRIDGE_ARGS=()
+        [[ -n "${CREW_SSID}" ]] && BRIDGE_ARGS+=(--ssid "${CREW_SSID}")
+        [[ -n "${CREW_PASSWORD}" ]] && BRIDGE_ARGS+=(--password "${CREW_PASSWORD}")
+        [[ -n "${CREW_IP}" ]] && BRIDGE_ARGS+=(--ip "${CREW_IP}")
+        [[ -n "${CREW_BAND}" ]] && BRIDGE_ARGS+=(--band "${CREW_BAND}")
+        [[ -n "${CREW_PIHOLE_IP}" ]] && BRIDGE_ARGS+=(--pihole-ip "${CREW_PIHOLE_IP}")
+        bash "${SCRIPT_DIR}/install-crew-bridge.sh" "${BRIDGE_ARGS[@]}"
     fi
 else
     echo "  configuring wired crew LAN..."
@@ -159,7 +299,12 @@ else
     if [[ "${SKIP_AP}" == true ]]; then
         echo "  skipping (--skip-ap)"
     else
-        bash "${SCRIPT_DIR}/install-ap.sh"
+        AP_ARGS=()
+        [[ -n "${CREW_SSID}" ]] && AP_ARGS+=(--ssid "${CREW_SSID}")
+        [[ -n "${CREW_PASSWORD}" ]] && AP_ARGS+=(--password "${CREW_PASSWORD}")
+        [[ -n "${CREW_IP}" ]] && AP_ARGS+=(--ip "${CREW_IP}")
+        [[ -n "${CREW_BAND}" ]] && AP_ARGS+=(--band "${CREW_BAND}")
+        bash "${SCRIPT_DIR}/install-ap.sh" "${AP_ARGS[@]}"
     fi
 fi
 
