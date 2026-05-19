@@ -221,6 +221,8 @@ echo "  Bridge IP configured."
 
 echo "Step 6: Configuring DHCP range and DNS..."
 mkdir -p /etc/NetworkManager/dnsmasq-shared.d
+rm -f /etc/NetworkManager/dnsmasq-shared.d/seabird-crew-lan.conf
+rm -f /etc/NetworkManager/dnsmasq-shared.d/seabird-ap.conf
 cat > "${SEABIRD_BRIDGE_CONF}" <<EOF
 # seabird crew LAN bridge DHCP config — managed by install-crew-bridge.sh, do not edit manually
 dhcp-range=${DHCP_START},${DHCP_END},12h
