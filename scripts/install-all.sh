@@ -167,11 +167,27 @@ if [[ "${BATCH_NETWORK}" == true ]]; then
 
     if [[ "${SKIP_AP}" != true ]]; then
         if [[ -z "${CREW_SSID}" ]]; then
-            while true; do
-                read -r -p "Crew AP SSID: " CREW_SSID
-                [[ -n "${CREW_SSID}" ]] && break
-                echo "SSID must not be empty."
-            done
+            CURRENT_AP_SSID="$(nmcli -g 802-11-wireless.ssid con show seabird-ap 2>/dev/null || true)"
+            CURRENT_AP_SSID="${CURRENT_AP_SSID//$'\n'/}"
+
+            if [[ -n "${CURRENT_AP_SSID}" ]]; then
+                read -r -p "Current AP SSID is '${CURRENT_AP_SSID}'. Change it? [y/N]: " _CHANGE_SSID
+                if [[ "${_CHANGE_SSID}" =~ ^[Yy]$ ]]; then
+                    while true; do
+                        read -r -p "New Crew AP SSID: " CREW_SSID
+                        [[ -n "${CREW_SSID}" ]] && break
+                        echo "SSID must not be empty."
+                    done
+                else
+                    CREW_SSID="${CURRENT_AP_SSID}"
+                fi
+            else
+                while true; do
+                    read -r -p "Crew AP SSID: " CREW_SSID
+                    [[ -n "${CREW_SSID}" ]] && break
+                    echo "SSID must not be empty."
+                done
+            fi
         fi
 
         if [[ -z "${CREW_PASSWORD}" ]]; then
