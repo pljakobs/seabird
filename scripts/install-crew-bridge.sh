@@ -170,7 +170,8 @@ nmcli con modify "${NM_BRIDGE_CONN}" \
 
 nmcli con up "${NM_BRIDGE_CONN}"
 sleep 1
-echo "  Bridge profile ready."
+BRIDGE_UUID="$(nmcli -g connection.uuid con show "${NM_BRIDGE_CONN}")"
+echo "  Bridge profile ready (uuid: ${BRIDGE_UUID})."
 
 # -- step 2: configure WiFi AP as bridge member ------------------------------
 
@@ -189,7 +190,7 @@ nmcli con add \
 
 nmcli con modify "${NM_AP_CONN}" \
     connection.zone '' \
-    connection.master "${NM_BRIDGE_CONN}" \
+    connection.master "${BRIDGE_UUID}" \
     connection.slave-type bridge \
     802-11-wireless.band "${BAND}" \
     802-11-wireless.ap-isolation no \
@@ -218,7 +219,7 @@ nmcli con add \
 
 nmcli con modify "${NM_WIRED_CONN}" \
     connection.zone '' \
-    connection.master "${NM_BRIDGE_CONN}" \
+    connection.master "${BRIDGE_UUID}" \
     connection.slave-type bridge \
     ipv4.method disabled \
     ipv6.method ignore \
@@ -244,10 +245,14 @@ echo "  DHCP and DNS configured."
 
 # -- step 5: allow cockpit from crew LAN -------------------------------------
 
-echo "Step 5: Ensuring Cockpit is reachable from crew LAN..."
+echo "Step 5: Ensuring firewall zones match bridge topology..."
+firewall-cmd --zone=lan --add-interface="${BRIDGE_NAME}" --permanent >/dev/null 2>&1 || true
+firewall-cmd --zone=lan --remove-interface="${AP_IFACE}" --permanent >/dev/null 2>&1 || true
+firewall-cmd --zone=lan --remove-interface="${WIRED_IFACE}" --permanent >/dev/null 2>&1 || true
+firewall-cmd --zone=wan --remove-interface="${WIRED_IFACE}" --permanent >/dev/null 2>&1 || true
 firewall-cmd --zone=lan --add-service=cockpit --permanent >/dev/null 2>&1 || true
 firewall-cmd --reload >/dev/null 2>&1 || true
-echo "  Cockpit service added to lan zone."
+echo "  Firewall updated: ${BRIDGE_NAME} in lan, ${WIRED_IFACE} removed from wan, cockpit allowed in lan."
 
 # -- step 6: register seabird.local in Pi-hole custom DNS --------------------
 
