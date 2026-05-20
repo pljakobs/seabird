@@ -32,9 +32,9 @@ done
 if systemctl is-active --quiet seabird-services.target 2>/dev/null; then
     echo "Stopping seabird-services.target before updating quadlets..."
     systemctl stop seabird-services.target
-elif systemctl list-units --state=active --no-legend 2>/dev/null | grep -qE "caddy|influxdb|signalk|grafana|homepage|pihole|navidrome|nextcloud-pod"; then
+elif systemctl list-units --state=active --no-legend 2>/dev/null | grep -qE "caddy|influxdb|signalk|grafana|homepage|pihole|navidrome|avnav|nextcloud-pod"; then
     echo "Stopping individual seabird services before updating quadlets..."
-    for svc in caddy influxdb signalk grafana homepage pihole navidrome nextcloud-pod; do
+    for svc in caddy influxdb signalk grafana homepage pihole navidrome avnav nextcloud-pod; do
         systemctl stop "${svc}.service" 2>/dev/null || true
     done
 fi

@@ -400,7 +400,7 @@ fi
 # Quadlet generator writes to /run/systemd/generator/
 GEN_DIR="/run/systemd/generator"
 QUADLET_UNITS=$(ls "${GEN_DIR}"/*.service "${GEN_DIR}"/*.pod 2>/dev/null | \
-    grep -E "caddy|signalk|influxdb|grafana|nextcloud|homepage|pihole|navidrome" || true)
+    grep -E "caddy|signalk|influxdb|grafana|nextcloud|homepage|pihole|navidrome|avnav" || true)
 
 if [[ -z "${QUADLET_UNITS}" ]]; then
     echo "  WARNING: quadlet generator produced no units — dumping generator errors:"
@@ -422,6 +422,7 @@ SERVICES=(
     homepage
     pihole
     navidrome
+    avnav
 )
 
 for svc in "${SERVICES[@]}"; do
@@ -452,8 +453,9 @@ echo "  Dashboard:  http://seabird.local:3002"
 echo "  Nextcloud:  http://seabird.local:8080"
 echo "  Signal-K:   http://seabird.local:3000"
 echo "  Grafana:    http://seabird.local:3001"
+echo "  AvNav:      http://seabird.local:8080"
 echo
-echo "Check service status with:  systemctl status caddy signalk influxdb grafana"
+echo "Check service status with:  systemctl status caddy signalk influxdb grafana avnav"
 echo "View logs with:             journalctl -u <service> -f"
 echo
 # Warn if any secrets files are still empty

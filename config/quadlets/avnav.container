@@ -1,0 +1,28 @@
+[Unit]
+Description=AvNav Navigation Server Container
+PartOf=seabird-services.target
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=docker.io/wellenvogel/avnav:latest
+ContainerName=avnav
+AutoUpdate=registry
+Pull=missing
+
+# Persistent storage for charts, logs, tracks, and layouts
+Volume=avnav-data:/data
+
+# Web UI port allocation (AvNav HTTP server)
+PublishPort=8080:8080
+
+# Device access for hardware peripherals (GPS, AIS via USB-to-Serial)
+# Adjust /dev/ttyUSB0 if your serial interface uses a different designation
+# Device=/dev/ttyUSB0:/dev/ttyUSB0
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=seabird-services.target default.target
