@@ -333,6 +333,9 @@ install -m 0755 "${DISPATCHER_SRC}/92-seabird-policy-routing" \
 echo "Installing Caddy config..."
 mkdir -p /etc/caddy/conf.d
 install -m 0644 "${SCRIPT_DIR}/../config/caddy/Caddyfile" /etc/caddy/Caddyfile
+# AvNav ocharts backend is proxied through Caddy on :8083.
+# Direct container-published :8083 has source-dependent hangs on tailnet clients.
+# Caddy keeps browser requests to :8083 working while forwarding locally.
 # /run/seabird must exist for the portal status JSON
 mkdir -p /run/seabird
 

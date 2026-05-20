@@ -6,7 +6,6 @@ Wants=network-online.target
 RequiresMountsFor=/srv/seabird/avnav
 
 [Container]
-# wellenvogel/avnav is not publicly pullable; xfreex images provide amd64+arm64 manifests
 Image=docker.io/xfreex/avnav-daily:latest
 ContainerName=avnav
 AutoUpdate=registry
@@ -18,17 +17,25 @@ Volume=/srv/seabird/avnav:/var/lib/avnav:Z
 
 # Web UI port allocation (AvNav HTTP server)
 PublishPort=8088:8080
-# ochartsng plugin backend
-PublishPort=8083:8083
+# ochartsng plugin backend (host-internal). External :8083 is served by Caddy
+# and proxied to this port to keep browser-side ":8083" requests working.
+PublishPort=28083:8083
 
 # Give AvNav/ochartsng enough time to shut down cleanly on updates/restarts
 StopTimeout=60
 
+# libsglarm64 (o-charts SafeGuard License) probes hardware/kernel paths for
+# fingerprinting and is sensitive to container hardening defaults on aarch64.
+# Mirror the known-good avnav-test runtime profile.
+PodmanArgs=--security-opt unmask=all
+PodmanArgs=--privileged
+
 # Device access for hardware peripherals (GPS, AIS via USB-to-Serial)
 # Adjust /dev/ttyUSB0 if your serial interface uses a different designation
 # Device=/dev/ttyUSB0:/dev/ttyUSB0
-# ocharts helper probes /dev/disk/by-uuid for media/license discovery
-Volume=/dev/disk:/dev/disk:ro
+# Make only /dev/disk/by-uuid visible so ochartsng can resolve chart media UUIDs.
+# Keep the scope narrow to avoid exposing the full /dev/disk tree.
+Volume=/dev/disk/by-uuid:/dev/disk/by-uuid:ro
 
 [Service]
 Restart=always

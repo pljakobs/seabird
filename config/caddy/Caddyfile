@@ -7,6 +7,11 @@
     admin off
 }
 
+# Dedicated listener for clients requesting host:8083 (used by AvNav ocharts UI)
+:8083 {
+  reverse_proxy 127.0.0.1:28083
+}
+
 # Landing page — links to management services and path-based service entrypoints
 :80 {
     handle /api/portal-status {
@@ -38,6 +43,11 @@
   handle_path /pihole* {
     uri strip_prefix /pihole
     reverse_proxy 127.0.0.1:3003
+  }
+
+  # o-charts backend via local-origin proxy path (experimental)
+  handle_path /ocharts* {
+    reverse_proxy 127.0.0.1:28083
   }
 
     handle {
