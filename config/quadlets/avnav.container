@@ -16,7 +16,12 @@ Pull=missing
 Volume=/srv/seabird/avnav:/data:Z
 
 # Web UI port allocation (AvNav HTTP server)
-PublishPort=8080:8080
+PublishPort=8088:8080
+# ochartsng plugin backend
+PublishPort=8083:8083
+
+# Give AvNav/ochartsng enough time to shut down cleanly on updates/restarts
+StopTimeout=60
 
 # Device access for hardware peripherals (GPS, AIS via USB-to-Serial)
 # Adjust /dev/ttyUSB0 if your serial interface uses a different designation
@@ -25,6 +30,7 @@ PublishPort=8080:8080
 [Service]
 Restart=always
 TimeoutStartSec=300
+TimeoutStopSec=70
 
 [Install]
 WantedBy=seabird-services.target default.target
