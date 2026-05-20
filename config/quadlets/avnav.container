@@ -13,7 +13,8 @@ AutoUpdate=registry
 Pull=missing
 
 # Persistent storage for charts, logs, tracks, and layouts
-Volume=/srv/seabird/avnav:/data:Z
+# xfreex/avnav-stable writes runtime state under /var/lib/avnav
+Volume=/srv/seabird/avnav:/var/lib/avnav:Z
 
 # Web UI port allocation (AvNav HTTP server)
 PublishPort=8088:8080
