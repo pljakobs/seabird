@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# install-crew-bridge.sh — configure br-crew bridge for unified crew LAN
+# install-crew-bridge.sh -- configure br-crew bridge for unified crew LAN
 #
-# Creates a kernel-level bridge (br-crew) using iproute2 and configures
-# wlp6s0 (WiFi AP) and enp4s0 (wired) as bridge members. Uses NetworkManager
-# only for IP address and DHCP server configuration.
+# Creates a NetworkManager-managed Linux bridge (br-crew) and attaches:
+# - crew WiFi AP (wlp6s0)
+# - crew wired port (default: end0, USB-attached)
 #
-# Safe approach: kernel bridge is created first, then interfaces are added,
-# then IP config is applied. This keeps connectivity alive during transitions.
+# The bridge itself serves DHCP using NetworkManager shared mode.
 #
 # Usage:
 #   sudo scripts/install-crew-bridge.sh
@@ -18,13 +17,14 @@
 #   --ip ADDR/PREFIX Bridge IP address and prefix length (default: 192.168.42.1/24)
 #   --pihole-ip IP   pihole DNS server IP (default: bridge IP)
 #   --band BAND      WiFi band: bg (2.4 GHz) or a (5 GHz, default: bg)
+#   --wired-iface IF Crew wired member interface (default: end0)
 #
 # Safe to re-run.
 
 set -euo pipefail
 
 AP_IFACE="wlp6s0"
-WIRED_IFACE="enp4s0"
+WIRED_IFACE="end0"
 BRIDGE_NAME="br-crew"
 NM_BRIDGE_CONN="crew-lan-bridge"
 NM_AP_CONN="seabird-ap"
@@ -66,6 +66,7 @@ while [[ $# -gt 0 ]]; do
         --ip)       BRIDGE_IP="$2";    shift 2 ;;
         --pihole-ip) PIHOLE_IP="$2"; shift 2 ;;
         --band)     BAND="$2";     shift 2 ;;
+        --wired-iface) WIRED_IFACE="$2"; shift 2 ;;
         -h|--help)
             sed -n '/^# install-crew-bridge/,/^[^#]/p' "$0" | grep '^#' | sed 's/^# \?//'
             exit 0 ;;
@@ -137,7 +138,7 @@ DHCP_END="${BRIDGE_BASE}.200"
 
 echo
 echo "Configuring unified crew LAN bridge:"
-echo "  Kernel bridge  : ${BRIDGE_NAME}"
+echo "  Bridge         : ${BRIDGE_NAME}"
 echo "  Members        : ${AP_IFACE}, ${WIRED_IFACE}"
 echo "  WiFi SSID      : ${SSID}"
 echo "  WiFi Band      : ${BAND} ($([ "${BAND}" = "a" ] && echo "5 GHz" || echo "2.4 GHz"))"
@@ -146,18 +147,32 @@ echo "  DHCP range     : ${DHCP_START} – ${DHCP_END}"
 echo "  DNS server     : ${PIHOLE_IP}"
 echo
 
-# ── step 1: create kernel bridge (if not exists) ────────────────────────────
+# -- step 1: create NM bridge profile and activate ---------------------------
 
-echo "Step 1: Creating kernel bridge..."
-if ! ip link show "${BRIDGE_NAME}" &>/dev/null; then
-    ip link add "${BRIDGE_NAME}" type bridge
-    ip link set "${BRIDGE_NAME}" up
-    echo "  Bridge created."
-else
-    echo "  Bridge already exists."
+echo "Step 1: Creating NetworkManager bridge profile..."
+if nmcli con show "${NM_BRIDGE_CONN}" &>/dev/null; then
+    nmcli con down "${NM_BRIDGE_CONN}" 2>/dev/null || true
+    nmcli con delete "${NM_BRIDGE_CONN}" 2>/dev/null || true
 fi
 
-# ── step 2: configure WiFi AP (no IP yet) ──────────────────────────────────
+nmcli con add \
+    type bridge \
+    ifname "${BRIDGE_NAME}" \
+    con-name "${NM_BRIDGE_CONN}"
+
+nmcli con modify "${NM_BRIDGE_CONN}" \
+    connection.zone lan \
+    bridge.stp no \
+    ipv4.method shared \
+    ipv4.addresses "${BRIDGE_IP}" \
+    ipv6.method ignore \
+    connection.autoconnect yes
+
+nmcli con up "${NM_BRIDGE_CONN}"
+sleep 1
+echo "  Bridge profile ready."
+
+# -- step 2: configure WiFi AP as bridge member ------------------------------
 
 echo "Step 2: Configuring WiFi AP..."
 if nmcli con show "${NM_AP_CONN}" &>/dev/null; then
@@ -173,7 +188,9 @@ nmcli con add \
     mode ap
 
 nmcli con modify "${NM_AP_CONN}" \
-    connection.zone lan \
+    connection.zone '' \
+    connection.master "${NM_BRIDGE_CONN}" \
+    connection.slave-type bridge \
     802-11-wireless.band "${BAND}" \
     802-11-wireless.ap-isolation no \
     802-11-wireless-security.key-mgmt wpa-psk \
@@ -186,7 +203,7 @@ nmcli con up "${NM_AP_CONN}" 2>/dev/null || true
 sleep 1
 echo "  WiFi AP ready."
 
-# ── step 3: configure wired interface (no IP yet) ──────────────────────────
+# -- step 3: configure wired bridge member -----------------------------------
 
 echo "Step 3: Configuring wired interface..."
 if nmcli con show "${NM_WIRED_CONN}" &>/dev/null; then
@@ -200,7 +217,9 @@ nmcli con add \
     con-name "${NM_WIRED_CONN}"
 
 nmcli con modify "${NM_WIRED_CONN}" \
-    connection.zone lan \
+    connection.zone '' \
+    connection.master "${NM_BRIDGE_CONN}" \
+    connection.slave-type bridge \
     ipv4.method disabled \
     ipv6.method ignore \
     connection.autoconnect yes
@@ -209,42 +228,9 @@ nmcli con up "${NM_WIRED_CONN}" 2>/dev/null || true
 sleep 1
 echo "  Wired interface ready."
 
-# ── step 4: add interfaces to kernel bridge ────────────────────────────────
+# -- step 4: configure DHCP and DNS ------------------------------------------
 
-echo "Step 4: Adding interfaces to kernel bridge..."
-ip link set "${AP_IFACE}" master "${BRIDGE_NAME}" 2>/dev/null || true
-echo "  ${AP_IFACE} added to bridge."
-ip link set "${WIRED_IFACE}" master "${BRIDGE_NAME}" 2>/dev/null || true
-echo "  ${WIRED_IFACE} added to bridge."
-sleep 1
-
-# ── step 5: configure IP on bridge (NM for DHCP) ────────────────────────────
-
-echo "Step 5: Configuring IP and DHCP on bridge..."
-if nmcli con show "${NM_BRIDGE_CONN}" &>/dev/null; then
-    nmcli con down "${NM_BRIDGE_CONN}" 2>/dev/null || true
-    nmcli con delete "${NM_BRIDGE_CONN}" 2>/dev/null || true
-fi
-
-nmcli con add \
-    type ethernet \
-    ifname "${BRIDGE_NAME}" \
-    con-name "${NM_BRIDGE_CONN}"
-
-nmcli con modify "${NM_BRIDGE_CONN}" \
-    connection.zone lan \
-    ipv4.method shared \
-    ipv4.addresses "${BRIDGE_IP}" \
-    ipv6.method ignore \
-    connection.autoconnect yes
-
-nmcli con up "${NM_BRIDGE_CONN}"
-sleep 2
-echo "  Bridge IP configured."
-
-# ── step 6: configure DHCP and DNS ─────────────────────────────────────────
-
-echo "Step 6: Configuring DHCP range and DNS..."
+echo "Step 4: Configuring DHCP range and DNS..."
 mkdir -p /etc/NetworkManager/dnsmasq-shared.d
 rm -f /etc/NetworkManager/dnsmasq-shared.d/seabird-crew-lan.conf
 rm -f /etc/NetworkManager/dnsmasq-shared.d/seabird-ap.conf
@@ -256,9 +242,16 @@ dhcp-option=6,${PIHOLE_IP},9.9.9.9
 EOF
 echo "  DHCP and DNS configured."
 
-# ── step 7: register seabird.local in Pi-hole custom DNS ──────────────────────
+# -- step 5: allow cockpit from crew LAN -------------------------------------
 
-echo "Step 7: Registering seabird.local in Pi-hole..."
+echo "Step 5: Ensuring Cockpit is reachable from crew LAN..."
+firewall-cmd --zone=lan --add-service=cockpit --permanent >/dev/null 2>&1 || true
+firewall-cmd --reload >/dev/null 2>&1 || true
+echo "  Cockpit service added to lan zone."
+
+# -- step 6: register seabird.local in Pi-hole custom DNS --------------------
+
+echo "Step 6: Registering seabird.local in Pi-hole..."
 PIHOLE_CUSTOM_LIST="/srv/seabird/pihole/etc-pihole/custom.list"
 if [[ -d /srv/seabird/pihole ]]; then
     mkdir -p /srv/seabird/pihole/etc-pihole
@@ -273,9 +266,9 @@ else
     echo "  Note: /srv/seabird/pihole not yet; skipping seabird.local entry."
 fi
 
-# ── step 8: legacy profile cleanup (safe) ───────────────────────────────────
+# -- step 7: legacy profile cleanup (safe) -----------------------------------
 
-echo "Step 8: Cleaning legacy profiles (safe mode)..."
+echo "Step 7: Cleaning legacy profiles (safe mode)..."
 for old_conn in "Wired connection 2" "Wired connection 1"; do
     if nmcli con show "${old_conn}" &>/dev/null; then
         nmcli con modify "${old_conn}" connection.autoconnect no 2>/dev/null || true
@@ -292,5 +285,5 @@ echo "  Wired interface  : ${WIRED_IFACE}"
 echo "  DHCP range       : ${DHCP_START} – ${DHCP_END}"
 echo "  DNS server       : ${PIHOLE_IP}"
 echo
-echo "Verify connectivity with: ip addr show ${BRIDGE_NAME}"
+echo "Verify connectivity with: nmcli -f NAME,DEVICE,TYPE,STATE con show --active"
 SUCCESS=1
