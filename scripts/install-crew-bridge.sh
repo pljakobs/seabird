@@ -37,6 +37,55 @@ BRIDGE_IP=""
 PIHOLE_IP=""  # pihole DNS server (defaults to bridge IP; pihole listens on 0.0.0.0:53)
 BAND="bg"
 SUCCESS=0
+RAW_ARGS=("$@")
+NO_ARGS_RUN=false
+if [[ ${#RAW_ARGS[@]} -eq 0 ]]; then
+    NO_ARGS_RUN=true
+fi
+
+STATE_FILE="/etc/seabird/install-state.json"
+STATE_KEY="crew-bridge"
+STATE_VERSION="3"
+
+declare -A INSTALL_STATE
+
+load_install_state() {
+    INSTALL_STATE=()
+    if [[ ! -f "${STATE_FILE}" ]]; then
+        return
+    fi
+    while IFS='=' read -r key value; do
+        [[ -z "${key}" ]] && continue
+        INSTALL_STATE["${key}"]="${value}"
+    done < <(
+        grep -Eo '"[^"]+"[[:space:]]*:[[:space:]]*"[^"]+"' "${STATE_FILE}" 2>/dev/null | \
+            sed -E 's/"([^"]+)"[[:space:]]*:[[:space:]]*"([^"]+)"/\1=\2/'
+    )
+}
+
+save_install_state() {
+    local tmp
+    tmp="$(mktemp)"
+    mkdir -p "$(dirname "${STATE_FILE}")"
+
+    mapfile -t _keys < <(printf '%s\n' "${!INSTALL_STATE[@]}" | sort)
+    {
+        printf '{\n'
+        local i key value sep
+        for ((i=0; i<${#_keys[@]}; i++)); do
+            key="${_keys[$i]}"
+            value="${INSTALL_STATE[$key]}"
+            sep=","
+            if [[ $i -eq $((${#_keys[@]} - 1)) ]]; then
+                sep=""
+            fi
+            printf '  "%s": "%s"%s\n' "${key}" "${value}" "${sep}"
+        done
+        printf '}\n'
+    } > "${tmp}"
+    install -m 0644 "${tmp}" "${STATE_FILE}"
+    rm -f "${tmp}"
+}
 
 OLD_AP_CONN="$(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | awk -F: -v dev="${AP_IFACE}" '$2==dev{print $1; exit}')"
 OLD_WIRED_CONN="$(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | awk -F: -v dev="${WIRED_IFACE}" '$2==dev{print $1; exit}')"
@@ -77,6 +126,21 @@ done
 if [[ $EUID -ne 0 ]]; then
     echo "error: must be run as root" >&2
     exit 1
+fi
+
+load_install_state
+if [[ "${NO_ARGS_RUN}" == true && -t 0 ]]; then
+    if [[ "${INSTALL_STATE[$STATE_KEY]:-}" == "${STATE_VERSION}" ]] &&
+       nmcli con show "${NM_BRIDGE_CONN}" &>/dev/null &&
+       nmcli con show "${NM_AP_CONN}" &>/dev/null &&
+       nmcli con show "${NM_WIRED_CONN}" &>/dev/null; then
+        read -r -p "Crew bridge/AP already configured (state v${STATE_VERSION}). Reconfigure now? [y/N]: " _RECONF
+        if [[ ! "${_RECONF}" =~ ^[Yy]$ ]]; then
+            echo "Keeping existing crew bridge/AP configuration."
+            SUCCESS=1
+            exit 0
+        fi
+    fi
 fi
 
 # ── interactive prompts for anything not supplied on command line ─────────────
@@ -291,4 +355,6 @@ echo "  DHCP range       : ${DHCP_START} – ${DHCP_END}"
 echo "  DNS server       : ${PIHOLE_IP}"
 echo
 echo "Verify connectivity with: nmcli -f NAME,DEVICE,TYPE,STATE con show --active"
+INSTALL_STATE["${STATE_KEY}"]="${STATE_VERSION}"
+save_install_state
 SUCCESS=1

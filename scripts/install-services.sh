@@ -52,6 +52,7 @@ echo "  $(ls "${QUADLET_SRC}"/*.container "${QUADLET_SRC}"/*.pod 2>/dev/null | w
 echo "Creating service data directories on NVMe..."
 dirs=(
     /srv/seabird/signalk
+    /srv/seabird/avnav
     /srv/seabird/influxdb/data
     /srv/seabird/influxdb/config
     /srv/seabird/grafana
@@ -265,7 +266,7 @@ echo "  systemctl stop    seabird-services.target"
 echo "  systemctl restart seabird-services.target"
 echo ""
 echo "Or individually:"
-echo "  systemctl start caddy influxdb signalk grafana nextcloud-pod homepage pihole navidrome"
+echo "  systemctl start caddy influxdb signalk grafana nextcloud-pod homepage pihole navidrome avnav"
 echo ""
 echo "Add crew users with:"
 echo "  scripts/add-user.sh <username>"

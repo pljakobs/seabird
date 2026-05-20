@@ -70,6 +70,83 @@ HEADSCALE_JOIN=""            # empty = let install-headscale.sh prompt
 HEADSCALE_LOGIN_SERVER=""
 HEADSCALE_AUTH_KEY=""
 RAW_ARGS=("$@")
+NO_ARGS_RUN=false
+if [[ ${#RAW_ARGS[@]} -eq 0 ]]; then
+    NO_ARGS_RUN=true
+fi
+
+STATE_FILE="/etc/seabird/install-state.json"
+STATE_STORAGE_VER="1"
+STATE_FIREWALL_VER="1"
+STATE_CREW_BRIDGE_VER="3"
+STATE_SERVICES_VER="2"
+STATE_HEADSCALE_VER="1"
+
+declare -A INSTALL_STATE
+
+load_install_state() {
+    INSTALL_STATE=()
+    if [[ ! -f "${STATE_FILE}" ]]; then
+        return
+    fi
+
+    while IFS='=' read -r key value; do
+        [[ -z "${key}" ]] && continue
+        INSTALL_STATE["${key}"]="${value}"
+    done < <(
+        grep -Eo '"[^"]+"[[:space:]]*:[[:space:]]*"[^"]+"' "${STATE_FILE}" 2>/dev/null | \
+            sed -E 's/"([^"]+)"[[:space:]]*:[[:space:]]*"([^"]+)"/\1=\2/'
+    )
+}
+
+save_install_state() {
+    local tmp
+    tmp="$(mktemp)"
+    mkdir -p "$(dirname "${STATE_FILE}")"
+
+    mapfile -t _keys < <(printf '%s\n' "${!INSTALL_STATE[@]}" | sort)
+    {
+        printf '{\n'
+        local i key value sep
+        for ((i=0; i<${#_keys[@]}; i++)); do
+            key="${_keys[$i]}"
+            value="${INSTALL_STATE[$key]}"
+            sep=","
+            if [[ $i -eq $((${#_keys[@]} - 1)) ]]; then
+                sep=""
+            fi
+            printf '  "%s": "%s"%s\n' "${key}" "${value}" "${sep}"
+        done
+        printf '}\n'
+    } > "${tmp}"
+    install -m 0644 "${tmp}" "${STATE_FILE}"
+    rm -f "${tmp}"
+}
+
+mark_step_version() {
+    local key="$1"
+    local version="$2"
+    INSTALL_STATE["${key}"]="${version}"
+    save_install_state
+}
+
+should_run_step() {
+    local key="$1"
+    local version="$2"
+    local label="$3"
+
+    if [[ "${NO_ARGS_RUN}" != true || ! -t 0 ]]; then
+        return 0
+    fi
+
+    if [[ "${INSTALL_STATE[$key]:-}" != "${version}" ]]; then
+        return 0
+    fi
+
+    local answer
+    read -r -p "Detected existing ${label} (state v${version}). Re-run? [y/N]: " answer
+    [[ "${answer}" =~ ^[Yy]$ ]]
+}
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -142,6 +219,8 @@ if [[ -n "${CREW_IP}" && ! "${CREW_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]
     echo "error: --crew-ip must be in ADDR/PREFIX format (e.g. 192.168.42.1/24)" >&2
     exit 1
 fi
+
+load_install_state
 
 if [[ "${BATCH_NETWORK}" == true ]]; then
     if [[ ! -t 0 ]]; then
@@ -318,7 +397,12 @@ section "2/7  Storage"
 if [[ "${SKIP_STORAGE}" == true ]]; then
     echo "  skipping (--skip-storage)"
 else
-    bash "${SCRIPT_DIR}/install-storage.sh" "${NVME_DEVICE}"
+    if should_run_step "storage" "${STATE_STORAGE_VER}" "storage setup"; then
+        bash "${SCRIPT_DIR}/install-storage.sh" "${NVME_DEVICE}"
+        mark_step_version "storage" "${STATE_STORAGE_VER}"
+    else
+        echo "  keeping existing storage setup"
+    fi
 fi
 
 # ── 3. Firewall + Caddy config ────────────────────────────────────────────────
@@ -327,10 +411,15 @@ section "3/7  Firewall"
 if [[ "${SKIP_FIREWALL}" == true ]]; then
     echo "  skipping (--skip-firewall)"
 else
-    FIREWALL_ARGS=()
-    [[ -n "${ALLOW_WAN_SSH}" ]] && FIREWALL_ARGS+=("--allow-wan-ssh=${ALLOW_WAN_SSH}")
-    [[ -n "${FIREWALL_MODE}" ]] && FIREWALL_ARGS+=("--mode=${FIREWALL_MODE}")
-    bash "${SCRIPT_DIR}/install-firewall.sh" "${FIREWALL_ARGS[@]}"
+    if should_run_step "firewall" "${STATE_FIREWALL_VER}" "firewall setup"; then
+        FIREWALL_ARGS=()
+        [[ -n "${ALLOW_WAN_SSH}" ]] && FIREWALL_ARGS+=("--allow-wan-ssh=${ALLOW_WAN_SSH}")
+        [[ -n "${FIREWALL_MODE}" ]] && FIREWALL_ARGS+=("--mode=${FIREWALL_MODE}")
+        bash "${SCRIPT_DIR}/install-firewall.sh" "${FIREWALL_ARGS[@]}"
+        mark_step_version "firewall" "${STATE_FIREWALL_VER}"
+    else
+        echo "  keeping existing firewall setup"
+    fi
 fi
 
 # ── 4. Wired crew LAN + WiFi access point ────────────────────────────────────
@@ -340,14 +429,19 @@ if [[ -f "${SCRIPT_DIR}/install-crew-bridge.sh" ]]; then
     if [[ "${SKIP_AP}" == true ]]; then
         echo "  skipping (--skip-ap)"
     else
-        echo "  configuring unified crew LAN bridge (wired + AP)..."
-        BRIDGE_ARGS=()
-        [[ -n "${CREW_SSID}" ]] && BRIDGE_ARGS+=(--ssid "${CREW_SSID}")
-        [[ -n "${CREW_PASSWORD}" ]] && BRIDGE_ARGS+=(--password "${CREW_PASSWORD}")
-        [[ -n "${CREW_IP}" ]] && BRIDGE_ARGS+=(--ip "${CREW_IP}")
-        [[ -n "${CREW_BAND}" ]] && BRIDGE_ARGS+=(--band "${CREW_BAND}")
-        [[ -n "${CREW_PIHOLE_IP}" ]] && BRIDGE_ARGS+=(--pihole-ip "${CREW_PIHOLE_IP}")
-        bash "${SCRIPT_DIR}/install-crew-bridge.sh" "${BRIDGE_ARGS[@]}"
+        if should_run_step "crew-bridge" "${STATE_CREW_BRIDGE_VER}" "crew bridge/AP setup"; then
+            echo "  configuring unified crew LAN bridge (wired + AP)..."
+            BRIDGE_ARGS=()
+            [[ -n "${CREW_SSID}" ]] && BRIDGE_ARGS+=(--ssid "${CREW_SSID}")
+            [[ -n "${CREW_PASSWORD}" ]] && BRIDGE_ARGS+=(--password "${CREW_PASSWORD}")
+            [[ -n "${CREW_IP}" ]] && BRIDGE_ARGS+=(--ip "${CREW_IP}")
+            [[ -n "${CREW_BAND}" ]] && BRIDGE_ARGS+=(--band "${CREW_BAND}")
+            [[ -n "${CREW_PIHOLE_IP}" ]] && BRIDGE_ARGS+=(--pihole-ip "${CREW_PIHOLE_IP}")
+            bash "${SCRIPT_DIR}/install-crew-bridge.sh" "${BRIDGE_ARGS[@]}"
+            mark_step_version "crew-bridge" "${STATE_CREW_BRIDGE_VER}"
+        else
+            echo "  keeping existing crew bridge/AP setup"
+        fi
     fi
 else
     echo "  configuring wired crew LAN..."
@@ -371,7 +465,12 @@ section "5/7  Services"
 if [[ "${SKIP_SERVICES}" == true ]]; then
     echo "  skipping (--skip-services)"
 else
-    bash "${SCRIPT_DIR}/install-services.sh"
+    if should_run_step "services" "${STATE_SERVICES_VER}" "services setup"; then
+        bash "${SCRIPT_DIR}/install-services.sh"
+        mark_step_version "services" "${STATE_SERVICES_VER}"
+    else
+        echo "  keeping existing services setup"
+    fi
 fi
 
 # ── 6. Headscale / Tailscale join ────────────────────────────────────────────
@@ -380,11 +479,16 @@ section "6/7  Headscale network"
 if [[ "${SKIP_HEADSCALE}" == true ]]; then
     echo "  skipping (--skip-headscale)"
 else
-    HEADSCALE_ARGS=()
-    [[ -n "${HEADSCALE_JOIN}" ]] && HEADSCALE_ARGS+=("--join=${HEADSCALE_JOIN}")
-    [[ -n "${HEADSCALE_LOGIN_SERVER}" ]] && HEADSCALE_ARGS+=("--login-server" "${HEADSCALE_LOGIN_SERVER}")
-    [[ -n "${HEADSCALE_AUTH_KEY}" ]] && HEADSCALE_ARGS+=("--auth-key" "${HEADSCALE_AUTH_KEY}")
-    bash "${SCRIPT_DIR}/install-headscale.sh" "${HEADSCALE_ARGS[@]}"
+    if should_run_step "headscale" "${STATE_HEADSCALE_VER}" "headscale setup"; then
+        HEADSCALE_ARGS=()
+        [[ -n "${HEADSCALE_JOIN}" ]] && HEADSCALE_ARGS+=("--join=${HEADSCALE_JOIN}")
+        [[ -n "${HEADSCALE_LOGIN_SERVER}" ]] && HEADSCALE_ARGS+=("--login-server" "${HEADSCALE_LOGIN_SERVER}")
+        [[ -n "${HEADSCALE_AUTH_KEY}" ]] && HEADSCALE_ARGS+=("--auth-key" "${HEADSCALE_AUTH_KEY}")
+        bash "${SCRIPT_DIR}/install-headscale.sh" "${HEADSCALE_ARGS[@]}"
+        mark_step_version "headscale" "${STATE_HEADSCALE_VER}"
+    else
+        echo "  keeping existing headscale setup"
+    fi
 fi
 
 # ── 7. Enable and start all services ─────────────────────────────────────────

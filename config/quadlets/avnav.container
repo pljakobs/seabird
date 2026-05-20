@@ -3,6 +3,7 @@ Description=AvNav Navigation Server Container
 PartOf=seabird-services.target
 After=network-online.target
 Wants=network-online.target
+RequiresMountsFor=/srv/seabird/avnav
 
 [Container]
 Image=docker.io/wellenvogel/avnav:latest
@@ -11,7 +12,7 @@ AutoUpdate=registry
 Pull=missing
 
 # Persistent storage for charts, logs, tracks, and layouts
-Volume=avnav-data:/data
+Volume=/srv/seabird/avnav:/data:Z
 
 # Web UI port allocation (AvNav HTTP server)
 PublishPort=8080:8080
