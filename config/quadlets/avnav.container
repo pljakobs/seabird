@@ -6,7 +6,8 @@ Wants=network-online.target
 RequiresMountsFor=/srv/seabird/avnav
 
 [Container]
-Image=docker.io/wellenvogel/avnav:latest
+# wellenvogel/avnav is not publicly pullable; xfreex/avnav-stable provides amd64+arm64 manifests
+Image=docker.io/xfreex/avnav-stable:latest
 ContainerName=avnav
 AutoUpdate=registry
 Pull=missing
