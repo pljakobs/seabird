@@ -27,6 +27,8 @@ StopTimeout=60
 # Device access for hardware peripherals (GPS, AIS via USB-to-Serial)
 # Adjust /dev/ttyUSB0 if your serial interface uses a different designation
 # Device=/dev/ttyUSB0:/dev/ttyUSB0
+# ocharts helper probes /dev/disk/by-uuid for media/license discovery
+Volume=/dev/disk:/dev/disk:ro
 
 [Service]
 Restart=always
