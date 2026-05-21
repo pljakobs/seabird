@@ -49,9 +49,12 @@
     reverse_proxy 127.0.0.1:28083
   }
 
-  # Signal-K — keep /signalk prefix when proxying.
-  # Signal-K webapp/API uses /signalk/v1/... paths; stripping the prefix breaks
-  # data calls from the UI (e.g. /signalk/v1/api/sources).
+  # Signal-K — /signalk is the discovery document; redirect to UI.
+  @signalk_root path /signalk /signalk/
+  redir @signalk_root /signalk/admin/ 302
+
+  # Keep /signalk prefix when proxying. Signal-K API/UI paths are rooted at
+  # /signalk/v1/... and /signalk/admin/.
   handle /signalk* {
     reverse_proxy 127.0.0.1:3000
   }

@@ -7,7 +7,7 @@
 
 - Marine:
     - Signal-K:
-        href: /signalk
+        href: /signalk/admin/
         description: Marine data hub
         icon: signalk.png
     - AvNav:
