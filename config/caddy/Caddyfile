@@ -28,6 +28,18 @@
         respond "No captive portal active." 503
     }
 
+  # AvNav UI (served under /avnav) issues absolute /api/... requests.
+  # Bridge those back to AvNav only when they originate from /avnav pages,
+  # so other /api endpoints (Homepage, portal-status, etc.) are unaffected.
+  @avnav_api {
+    path /api/*
+    not path /api/portal-status
+    header Referer *avnav*
+  }
+  handle @avnav_api {
+    reverse_proxy 127.0.0.1:8088
+  }
+
   # Grafana — sub-path aware (GF_SERVER_SERVE_FROM_SUB_PATH=true)
   handle_path /grafana* {
     reverse_proxy 127.0.0.1:3001
