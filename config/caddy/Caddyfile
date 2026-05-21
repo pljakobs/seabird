@@ -41,13 +41,38 @@
 
   # Pi-hole — strip prefix before forwarding
   handle_path /pihole* {
-    uri strip_prefix /pihole
     reverse_proxy 127.0.0.1:3003
   }
 
-  # o-charts backend via local-origin proxy path (experimental)
+  # o-charts backend via local-origin proxy path
   handle_path /ocharts* {
     reverse_proxy 127.0.0.1:28083
+  }
+
+  # Signal-K — strip prefix, serves from root
+  handle_path /signalk* {
+    reverse_proxy 127.0.0.1:3000
+  }
+
+  # AvNav — strip prefix, serves from root
+  handle_path /avnav* {
+    reverse_proxy 127.0.0.1:8088
+  }
+
+  # InfluxDB — strip prefix, SPA serves from root
+  handle_path /influxdb* {
+    reverse_proxy 127.0.0.1:8086
+  }
+
+  # Nextcloud — NOTE: requires overwritewebroot=/nextcloud in config.php
+  #             for full functionality (redirects, asset paths)
+  handle_path /nextcloud* {
+    reverse_proxy 127.0.0.1:8080
+  }
+
+  # Cockpit — NOTE: requires UrlRoot=/cockpit in /etc/cockpit/cockpit.conf
+  handle_path /cockpit* {
+    reverse_proxy 127.0.0.1:9090
   }
 
     # Default: proxy to Homepage dashboard

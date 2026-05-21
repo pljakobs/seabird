@@ -1,55 +1,62 @@
 # Homepage services config — /srv/seabird/homepage/services.yaml
 # https://gethomepage.dev/configs/services/
+#
+# All hrefs use root-relative paths (/service) so links work regardless of
+# whether the dashboard is reached via seabird.local, Tailscale IP, or any
+# other hostname — the browser resolves them against the current origin.
 
 - Marine:
     - Signal-K:
-        href: http://seabird.local:3000
+        href: /signalk
         description: Marine data hub
         icon: signalk.png
     - AvNav:
-        href: http://seabird.local:8088
+        href: /avnav
         description: Navigation & chart plotting
         # AvNav logo from upstream project repo (not in dashboard-icons)
         icon: https://raw.githubusercontent.com/wellenvogel/avnav/master/viewer/images/icons/Logo.png
     - Ocharts:
-        href: http://seabird.local:8083
+        href: /ocharts
         description: Chart server
         # No official ocharts icon; using Material Design Icons nautical chart icon
         icon: mdi-map
 
 - Data:
     - InfluxDB:
-        href: http://seabird.local:8086
+        href: /influxdb
         description: Time-series database
         icon: influxdb.png
     - Grafana:
-        href: http://seabird.local:3001
+        href: /grafana
         description: Charts & dashboards
         icon: grafana.png
         widget:
           type: grafana
-          url: http://seabird.local:3001
+          # Widget URL is fetched server-side from inside the container
+          url: http://127.0.0.1:3001
 
 - Entertainment:
     - Navidrome:
-        href: http://seabird.local:4533
+        href: /navidrome
         description: Music streaming
         icon: navidrome.png
     - Nextcloud:
-        href: http://seabird.local:8080
+        # Full functionality requires: overwritewebroot=/nextcloud in config.php
+        href: /nextcloud
         description: Files & crew sync
         icon: nextcloud.png
 
 - System:
     - Pi-hole:
-        href: http://seabird.local:3003/admin
+        href: /pihole/admin
         description: DNS & ad blocking
         icon: pi-hole.png
     - Caddy:
-        href: http://seabird.local
+        href: /
         description: Landing page & reverse proxy
         icon: caddy.png
     - Cockpit:
-        href: http://seabird.local:9090
+        # Full functionality requires: UrlRoot=/cockpit in /etc/cockpit/cockpit.conf
+        href: /cockpit
         description: System admin
         icon: cockpit.png
