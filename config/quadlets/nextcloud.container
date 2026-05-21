@@ -19,7 +19,7 @@ Environment=POSTGRES_DB=nextcloud
 Environment=POSTGRES_USER=nextcloud
 Environment=REDIS_HOST=localhost
 Environment=REDIS_HOST_PORT=6379
-Environment=NEXTCLOUD_TRUSTED_DOMAINS=seabird.local localhost 127.0.0.1
+Environment=NEXTCLOUD_TRUSTED_DOMAINS=seabird.local localhost 127.0.0.1 100.64.0.1
 EnvironmentFile=/etc/seabird/nextcloud.env
 
 [Service]

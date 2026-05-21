@@ -252,6 +252,38 @@ elif [[ ! -s /etc/containers/auth.json ]]; then
     echo "  or images will be pulled unauthenticated (rate-limited)."
 fi
 
+# ── Nextcloud sub-path config ─────────────────────────────────────────────────
+# Ensure overwritewebroot and all trusted_domains are set so Nextcloud works
+# correctly when served through the Caddy /nextcloud sub-path proxy.
+# The file goes into the HTML volume (/srv/seabird/nextcloud/html/config/)
+# which is already bind-mounted at /var/www/html inside the container, so no
+# extra volume mount is needed.  It is always installed/updated so config
+# changes in the repo are picked up on re-runs.
+
+echo "Installing Nextcloud sub-path config..."
+NC_CONFIG_DIR="/srv/seabird/nextcloud/html/config"
+if [[ -d "${NC_CONFIG_DIR}" ]]; then
+    install -m 0644 "${CONFIG_SRC}/nextcloud/zz-seabird.config.php" \
+        "${NC_CONFIG_DIR}/zz-seabird.config.php"
+    echo "  installed ${NC_CONFIG_DIR}/zz-seabird.config.php"
+else
+    echo "  ${NC_CONFIG_DIR} not present yet — will be installed on first Nextcloud start"
+    echo "  (run install-services.sh again after Nextcloud initialises)"
+fi
+
+# ── Cockpit sub-path config ───────────────────────────────────────────────────
+# UrlRoot=/cockpit tells Cockpit to prefix all asset and redirect URLs with
+# /cockpit so they resolve correctly when proxied via Caddy's handle_path.
+
+echo "Installing Cockpit sub-path config..."
+mkdir -p /etc/cockpit
+install -m 0644 "${CONFIG_SRC}/cockpit/cockpit.conf" /etc/cockpit/cockpit.conf
+echo "  installed /etc/cockpit/cockpit.conf"
+if systemctl is-active --quiet cockpit.service 2>/dev/null; then
+    systemctl restart cockpit.service
+    echo "  cockpit.service restarted"
+fi
+
 # ── reload systemd to pick up quadlets ───────────────────────────────────────
 
 echo ""
