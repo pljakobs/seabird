@@ -9,7 +9,30 @@
 
 # Dedicated listener for clients requesting host:8083 (used by AvNav ocharts UI)
 :8083 {
-  reverse_proxy 127.0.0.1:28083
+  # Browser clients may preflight cross-origin requests to :8083.
+  # Respond explicitly to OPTIONS so fetch() does not fail with NetworkError.
+  @preflight {
+    method OPTIONS
+    header Origin *
+  }
+  respond @preflight "" 204
+
+  # Reflect Origin for browser CORS checks on both preflight and actual requests.
+  @cors header Origin *
+  header @cors Access-Control-Allow-Origin "{http.request.header.Origin}"
+  header @cors Access-Control-Allow-Credentials "true"
+  header @cors Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+  header @cors Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, Accept, Origin"
+  header @cors Access-Control-Max-Age "86400"
+  header @cors Vary "Origin"
+
+  reverse_proxy 127.0.0.1:28083 {
+    # Backend returns wildcard ACAO; replace with reflected Origin to stay valid
+    # when credentials/cookies are used by browser-side fetch.
+    header_down -Access-Control-Allow-Origin
+    header_down -Access-Control-Allow-Credentials
+    header_down -Vary
+  }
 }
 
 # Landing page — links to management services and path-based service entrypoints
