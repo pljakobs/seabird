@@ -49,9 +49,15 @@
     reverse_proxy 127.0.0.1:28083
   }
 
-  # Signal-K — strip prefix, serves from root
+  # Signal-K — strip /signalk prefix; rewrite redirect Location headers to
+  # re-add /signalk so the browser stays within the Caddy sub-path.
+  # Signal-K redirects / → /admin on first hit, so without this the browser
+  # would end up at /admin (→ Homepage default handler) instead of /signalk/admin.
   handle_path /signalk* {
-    reverse_proxy 127.0.0.1:3000
+    reverse_proxy 127.0.0.1:3000 {
+      # Match both relative (/admin) and absolute (http://host:port/admin) locations
+      header_down Location "^(?:https?://[^/]+)?(/.*)" "/signalk$1"
+    }
   }
 
   # AvNav — strip prefix, serves from root
