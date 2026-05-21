@@ -6,17 +6,6 @@
         href: http://seabird.local:3000
         description: Marine data hub
         icon: signalk.png
-    - Grafana:
-        href: http://seabird.local:3001
-        description: Charts & dashboards
-        icon: grafana.png
-        widget:
-          type: grafana
-          url: http://seabird.local:3001
-    - Navidrome:
-        href: http://seabird.local:4533
-        description: Music streaming
-        icon: navidrome.png
     - AvNav:
         href: http://seabird.local:8088
         description: Navigation & chart plotting
@@ -31,6 +20,19 @@
         href: http://seabird.local:8086
         description: Time-series database
         icon: influxdb.png
+    - Grafana:
+        href: http://seabird.local:3001
+        description: Charts & dashboards
+        icon: grafana.png
+        widget:
+          type: grafana
+          url: http://seabird.local:3001
+
+- Entertainment:
+    - Navidrome:
+        href: http://seabird.local:4533
+        description: Music streaming
+        icon: navidrome.png
     - Nextcloud:
         href: http://seabird.local:8080
         description: Files & crew sync
