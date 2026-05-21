@@ -17,6 +17,14 @@
         href: http://seabird.local:4533
         description: Music streaming
         icon: navidrome.png
+    - AvNav:
+        href: http://seabird.local:8088
+        description: Navigation & chart plotting
+        icon: avnav.png
+    - Ocharts:
+        href: http://seabird.local:8083
+        description: Chart server 
+        icon: ocharts.png
 
 - Data:
     - InfluxDB:
