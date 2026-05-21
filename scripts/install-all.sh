@@ -76,11 +76,6 @@ if [[ ${#RAW_ARGS[@]} -eq 0 ]]; then
 fi
 
 STATE_FILE="/etc/seabird/install-state.json"
-STATE_STORAGE_VER="1"
-STATE_FIREWALL_VER="1"
-STATE_CREW_BRIDGE_VER="3"
-STATE_SERVICES_VER="2"
-STATE_HEADSCALE_VER="1"
 
 declare -A INSTALL_STATE
 
@@ -123,28 +118,83 @@ save_install_state() {
     rm -f "${tmp}"
 }
 
-mark_step_version() {
+# Compute a combined sha256 hash over all given file paths (globs pre-expanded
+# by the caller). Missing/unreadable files are silently skipped. Paths are
+# sorted before hashing so expansion order does not affect the result.
+compute_module_hash() {
+    local -a existing=()
+    local f
+    for f in "$@"; do
+        [[ -f "$f" ]] && existing+=("$f")
+    done
+    if [[ ${#existing[@]} -eq 0 ]]; then
+        echo "empty"
+        return
+    fi
+    printf '%s\n' "${existing[@]}" | sort -u | while IFS= read -r fpath; do
+        sha256sum "$fpath"
+    done | sha256sum | awk '{print $1}'
+}
+
+# Store a module's hash in the state file.
+mark_step_hash() {
     local key="$1"
-    local version="$2"
-    INSTALL_STATE["${key}"]="${version}"
+    local hash="$2"
+    INSTALL_STATE["${key}_hash"]="${hash}"
     save_install_state
 }
 
+# Decide whether to run a module step based on config-file drift.
+#
+#   key         — state key prefix (e.g. "firewall")
+#   label       — human-readable module name
+#   current_hash — output of compute_module_hash for this module's files
+#
+# Non-interactive (args supplied on command line, or stdin not a tty):
+#   always returns 0 (run).
+# Interactive (no-args run, stdin is a tty):
+#   - No stored hash (first install)       → run unconditionally.
+#   - Hash changed since last run          → "Config changed. Deploy? [Y/n]" (default yes).
+#   - Hash unchanged                       → "No changes. Re-run? [y/N]"   (default no).
 should_run_step() {
     local key="$1"
-    local version="$2"
-    local label="$3"
+    local label="$2"
+    local current_hash="$3"
 
     if [[ "${NO_ARGS_RUN}" != true || ! -t 0 ]]; then
         return 0
     fi
 
-    if [[ "${INSTALL_STATE[$key]:-}" != "${version}" ]]; then
+    local stored_hash="${INSTALL_STATE["${key}_hash"]:-}"
+
+    if [[ -z "${stored_hash}" ]]; then
+        echo "  ${label}: no previous install recorded."
         return 0
     fi
 
     local answer
-    read -r -p "Detected existing ${label} (state v${version}). Re-run? [y/N]: " answer
+    if [[ "${stored_hash}" != "${current_hash}" ]]; then
+        echo "  ${label}: config files changed since last install."
+        read -r -p "  Deploy updated ${label} config? [Y/n]: " answer
+        answer="${answer:-Y}"
+        [[ "${answer}" =~ ^[Yy]$ ]]
+    else
+        echo "  ${label}: no config changes detected."
+        read -r -p "  Re-run ${label} anyway? [y/N]: " answer
+        [[ "${answer}" =~ ^[Yy]$ ]]
+    fi
+}
+
+# For modules with interactive configuration (network, headscale): after the
+# user has agreed to run the module, optionally clear pre-collected answers so
+# the sub-script prompts interactively.  Returns 0 if user wants to reconfigure.
+ask_reconfigure() {
+    local label="$1"
+    if [[ "${NO_ARGS_RUN}" != true || ! -t 0 ]]; then
+        return 1
+    fi
+    local answer
+    read -r -p "  Reconfigure ${label} interactively? [y/N]: " answer
     [[ "${answer}" =~ ^[Yy]$ ]]
 }
 
@@ -397,9 +447,11 @@ section "2/7  Storage"
 if [[ "${SKIP_STORAGE}" == true ]]; then
     echo "  skipping (--skip-storage)"
 else
-    if should_run_step "storage" "${STATE_STORAGE_VER}" "storage setup"; then
+    _hash_storage=$(compute_module_hash \
+        "${SCRIPT_DIR}/install-storage.sh")
+    if should_run_step "storage" "Storage" "${_hash_storage}"; then
         bash "${SCRIPT_DIR}/install-storage.sh" "${NVME_DEVICE}"
-        mark_step_version "storage" "${STATE_STORAGE_VER}"
+        mark_step_hash "storage" "${_hash_storage}"
     else
         echo "  keeping existing storage setup"
     fi
@@ -411,12 +463,22 @@ section "3/7  Firewall"
 if [[ "${SKIP_FIREWALL}" == true ]]; then
     echo "  skipping (--skip-firewall)"
 else
-    if should_run_step "firewall" "${STATE_FIREWALL_VER}" "firewall setup"; then
+    _hash_firewall=$(compute_module_hash \
+        "${SCRIPT_DIR}/install-firewall.sh" \
+        "${SCRIPT_DIR}/../config/firewalld/zones"/*.xml \
+        "${SCRIPT_DIR}/../config/nm-dispatcher"/9* \
+        "${SCRIPT_DIR}/../config/caddy/Caddyfile")
+    if should_run_step "firewall" "Firewall" "${_hash_firewall}"; then
+        # Interactive reconfigure: clear pre-collected answers to force prompts
+        if ask_reconfigure "Firewall"; then
+            ALLOW_WAN_SSH=""
+            FIREWALL_MODE=""
+        fi
         FIREWALL_ARGS=()
         [[ -n "${ALLOW_WAN_SSH}" ]] && FIREWALL_ARGS+=("--allow-wan-ssh=${ALLOW_WAN_SSH}")
         [[ -n "${FIREWALL_MODE}" ]] && FIREWALL_ARGS+=("--mode=${FIREWALL_MODE}")
         bash "${SCRIPT_DIR}/install-firewall.sh" "${FIREWALL_ARGS[@]}"
-        mark_step_version "firewall" "${STATE_FIREWALL_VER}"
+        mark_step_hash "firewall" "${_hash_firewall}"
     else
         echo "  keeping existing firewall setup"
     fi
@@ -429,7 +491,18 @@ if [[ -f "${SCRIPT_DIR}/install-crew-bridge.sh" ]]; then
     if [[ "${SKIP_AP}" == true ]]; then
         echo "  skipping (--skip-ap)"
     else
-        if should_run_step "crew-bridge" "${STATE_CREW_BRIDGE_VER}" "crew bridge/AP setup"; then
+        _hash_crew_bridge=$(compute_module_hash \
+            "${SCRIPT_DIR}/install-crew-bridge.sh" \
+            "${SCRIPT_DIR}/../config/nm-dnsmasq-shared"/*.conf)
+        if should_run_step "crew-bridge" "Crew LAN/AP" "${_hash_crew_bridge}"; then
+            # Interactive reconfigure: clear pre-collected network settings
+            if ask_reconfigure "Crew LAN/AP (SSID, password, IP, band)"; then
+                CREW_SSID=""
+                CREW_PASSWORD=""
+                CREW_IP=""
+                CREW_BAND=""
+                CREW_PIHOLE_IP=""
+            fi
             echo "  configuring unified crew LAN bridge (wired + AP)..."
             BRIDGE_ARGS=()
             [[ -n "${CREW_SSID}" ]] && BRIDGE_ARGS+=(--ssid "${CREW_SSID}")
@@ -438,7 +511,7 @@ if [[ -f "${SCRIPT_DIR}/install-crew-bridge.sh" ]]; then
             [[ -n "${CREW_BAND}" ]] && BRIDGE_ARGS+=(--band "${CREW_BAND}")
             [[ -n "${CREW_PIHOLE_IP}" ]] && BRIDGE_ARGS+=(--pihole-ip "${CREW_PIHOLE_IP}")
             bash "${SCRIPT_DIR}/install-crew-bridge.sh" "${BRIDGE_ARGS[@]}"
-            mark_step_version "crew-bridge" "${STATE_CREW_BRIDGE_VER}"
+            mark_step_hash "crew-bridge" "${_hash_crew_bridge}"
         else
             echo "  keeping existing crew bridge/AP setup"
         fi
@@ -465,9 +538,16 @@ section "5/7  Services"
 if [[ "${SKIP_SERVICES}" == true ]]; then
     echo "  skipping (--skip-services)"
 else
-    if should_run_step "services" "${STATE_SERVICES_VER}" "services setup"; then
+    _hash_services=$(compute_module_hash \
+        "${SCRIPT_DIR}/install-services.sh" \
+        "${SCRIPT_DIR}/../config/quadlets"/*.container \
+        "${SCRIPT_DIR}/../config/quadlets"/*.pod \
+        "${SCRIPT_DIR}/../config/homepage"/*.yaml \
+        "${SCRIPT_DIR}/../config/caddy/Caddyfile" \
+        "${SCRIPT_DIR}/../config/tmpfiles.d"/*.conf)
+    if should_run_step "services" "Services" "${_hash_services}"; then
         bash "${SCRIPT_DIR}/install-services.sh"
-        mark_step_version "services" "${STATE_SERVICES_VER}"
+        mark_step_hash "services" "${_hash_services}"
     else
         echo "  keeping existing services setup"
     fi
@@ -479,13 +559,21 @@ section "6/7  Headscale network"
 if [[ "${SKIP_HEADSCALE}" == true ]]; then
     echo "  skipping (--skip-headscale)"
 else
-    if should_run_step "headscale" "${STATE_HEADSCALE_VER}" "headscale setup"; then
+    _hash_headscale=$(compute_module_hash \
+        "${SCRIPT_DIR}/install-headscale.sh")
+    if should_run_step "headscale" "Headscale" "${_hash_headscale}"; then
+        # Interactive reconfigure: clear pre-collected join settings
+        if ask_reconfigure "Headscale (login server, auth key)"; then
+            HEADSCALE_JOIN=""
+            HEADSCALE_LOGIN_SERVER=""
+            HEADSCALE_AUTH_KEY=""
+        fi
         HEADSCALE_ARGS=()
         [[ -n "${HEADSCALE_JOIN}" ]] && HEADSCALE_ARGS+=("--join=${HEADSCALE_JOIN}")
         [[ -n "${HEADSCALE_LOGIN_SERVER}" ]] && HEADSCALE_ARGS+=("--login-server" "${HEADSCALE_LOGIN_SERVER}")
         [[ -n "${HEADSCALE_AUTH_KEY}" ]] && HEADSCALE_ARGS+=("--auth-key" "${HEADSCALE_AUTH_KEY}")
         bash "${SCRIPT_DIR}/install-headscale.sh" "${HEADSCALE_ARGS[@]}"
-        mark_step_version "headscale" "${STATE_HEADSCALE_VER}"
+        mark_step_hash "headscale" "${_hash_headscale}"
     else
         echo "  keeping existing headscale setup"
     fi

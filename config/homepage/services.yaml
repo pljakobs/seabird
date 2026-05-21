@@ -9,11 +9,13 @@
     - AvNav:
         href: http://seabird.local:8088
         description: Navigation & chart plotting
-        icon: avnav.png
+        # AvNav logo from upstream project repo (not in dashboard-icons)
+        icon: https://raw.githubusercontent.com/wellenvogel/avnav/master/viewer/images/icons/Logo.png
     - Ocharts:
         href: http://seabird.local:8083
-        description: Chart server 
-        icon: ocharts.png
+        description: Chart server
+        # No official ocharts icon; using Material Design Icons nautical chart icon
+        icon: mdi-map
 
 - Data:
     - InfluxDB:

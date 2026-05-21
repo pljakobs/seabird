@@ -13,6 +13,9 @@ Pull=missing
 
 PublishPort=3002:3000
 
+# Homepage checks exact Host header values (no CIDR matching).
+# seabird.local (no port) is used when Caddy proxies :80 → homepage
+Environment=HOMEPAGE_ALLOWED_HOSTS=seabird.local,seabird.local:3002,100.64.0.1,100.64.0.1:3002,192.168.42.1,192.168.42.1:3002,192.168.29.1,192.168.29.1:3002
 # Config files — create these in /srv/seabird/homepage/ to customise:
 #   services.yaml   — service tiles
 #   bookmarks.yaml  — bookmark links
