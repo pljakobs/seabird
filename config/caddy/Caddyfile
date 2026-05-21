@@ -28,7 +28,7 @@
   header @cors Access-Control-Allow-Origin "{http.request.header.Origin}"
   header @cors Access-Control-Allow-Credentials "true"
   header @cors Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-  header @cors Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, Accept, Origin"
+  header @cors Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma"
   header @cors Access-Control-Max-Age "86400"
   header @cors Vary "Origin"
 
@@ -118,6 +118,24 @@
       # AvNav can redirect to root-relative paths; keep them under /avnav.
       header_down Location "^(?:https?://[^/]+)?(/.*)$" "/avnav$1"
     }
+  }
+
+  # AvNav emits root-relative URLs for its static assets and WebSocket.
+  # Route these specific paths to AvNav so they don't fall through to Homepage.
+  handle /modules/* {
+    reverse_proxy 127.0.0.1:8088
+  }
+  handle /viewer/* {
+    reverse_proxy 127.0.0.1:8088
+  }
+  handle /plugins/* {
+    reverse_proxy 127.0.0.1:8088
+  }
+  handle /user/* {
+    reverse_proxy 127.0.0.1:8088
+  }
+  handle /remotechannels/* {
+    reverse_proxy 127.0.0.1:8088
   }
 
   # InfluxDB — strip prefix, SPA serves from root
