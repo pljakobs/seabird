@@ -71,7 +71,10 @@
 
   # AvNav — strip prefix, serves from root
   handle_path /avnav* {
-    reverse_proxy 127.0.0.1:8088
+    reverse_proxy 127.0.0.1:8088 {
+      # AvNav can redirect to root-relative paths; keep them under /avnav.
+      header_down Location "^(?:https?://[^/]+)?(/.*)$" "/avnav$1"
+    }
   }
 
   # InfluxDB — strip prefix, SPA serves from root
