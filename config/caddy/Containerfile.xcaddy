@@ -1,0 +1,9 @@
+FROM docker.io/caddy:builder AS builder
+
+ARG CADDY_VERSION=v2.11.3
+RUN xcaddy build ${CADDY_VERSION} \
+    --with github.com/caddyserver/replace-response \
+    --output /usr/bin/caddy
+
+FROM docker.io/library/caddy:latest
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy

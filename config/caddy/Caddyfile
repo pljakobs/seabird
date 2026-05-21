@@ -4,7 +4,7 @@
 # and picked up via the import directive below.
 
 {
-    admin off
+    admin localhost:2019
 }
 
 # Dedicated listener for clients requesting host:8083 (used by AvNav ocharts UI)
@@ -32,12 +32,19 @@
   header @cors Access-Control-Max-Age "86400"
   header @cors Vary "Origin"
 
+  # Rewrite the internal Podman container IP that oexserverd bakes into avnav.xml
+  # and encrypted tile URLs (e.g. http://10.88.0.x:8083/...).  The container IP
+  # changes on every restart; replace it with whatever host:port the client used.
+  replace re "http://10\.88\.[0-9]+\.[0-9]+:8083" "http://{http.request.hostport}"
+
   reverse_proxy 127.0.0.1:28083 {
     # Backend returns wildcard ACAO; replace with reflected Origin to stay valid
     # when credentials/cookies are used by browser-side fetch.
     header_down -Access-Control-Allow-Origin
     header_down -Access-Control-Allow-Credentials
     header_down -Vary
+    # Prevent backend compression so replace can rewrite response bodies
+    header_up Accept-Encoding identity
   }
 }
 
@@ -87,7 +94,14 @@
 
   # o-charts backend via local-origin proxy path
   handle_path /ocharts* {
-    reverse_proxy 127.0.0.1:28083
+    reverse_proxy 127.0.0.1:28083 {
+      # Tell ocharts the public origin it should advertise back to clients.
+      # The backend can use this to emit relative or hostless URLs instead of
+      # baking in the container-internal address.
+      header_up Host {hostport}
+      header_up X-Forwarded-Host {hostport}
+      header_up X-Forwarded-Proto {scheme}
+    }
   }
 
   # Signal-K — /signalk is the discovery document; redirect to UI.
