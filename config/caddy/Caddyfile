@@ -11,13 +11,19 @@
 :8083 {
   # Browser clients may preflight cross-origin requests to :8083.
   # Respond explicitly to OPTIONS so fetch() does not fail with NetworkError.
+  # Also handle Chrome Private Network Access (PNA) preflights.
   @preflight {
     method OPTIONS
     header Origin *
   }
+  header @preflight Access-Control-Allow-Origin "{http.request.header.Origin}"
+  header @preflight Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+  header @preflight Access-Control-Allow-Headers "{http.request.header.Access-Control-Request-Headers}"
+  header @preflight Access-Control-Allow-Private-Network "true"
+  header @preflight Access-Control-Max-Age "86400"
   respond @preflight "" 204
 
-  # Reflect Origin for browser CORS checks on both preflight and actual requests.
+  # Reflect Origin for browser CORS checks on actual requests.
   @cors header Origin *
   header @cors Access-Control-Allow-Origin "{http.request.header.Origin}"
   header @cors Access-Control-Allow-Credentials "true"
@@ -51,11 +57,11 @@
         respond "No captive portal active." 503
     }
 
-  # AvNav UI (served under /avnav) issues absolute /api/... requests.
+  # AvNav UI (served under /avnav) issues absolute /api and /api/... requests.
   # Bridge those back to AvNav only when they originate from /avnav pages,
   # so other /api endpoints (Homepage, portal-status, etc.) are unaffected.
   @avnav_api {
-    path /api/*
+    path /api /api/*
     not path /api/portal-status
     header Referer *avnav*
   }
