@@ -56,7 +56,11 @@
   # Signal-K admin UI is mounted at /admin on the backend. Strip /signalk for
   # admin paths only, so /signalk/admin/... -> /admin/...
   handle_path /signalk/admin* {
-    reverse_proxy 127.0.0.1:3000
+    reverse_proxy 127.0.0.1:3000 {
+      # Backend may redirect to /admin (or absolute http://host/admin).
+      # Keep client-visible URLs inside the /signalk prefix.
+      header_down Location "^(?:https?://[^/]+)?(/admin(?:/.*)?)$" "/signalk$1"
+    }
   }
 
   # Keep /signalk prefix when proxying. Signal-K API/UI paths are rooted at
