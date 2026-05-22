@@ -60,6 +60,13 @@ Chart plotter and navigation interface. Runs [AvNav](https://github.com/wellenvo
 ### Ocharts — `/ocharts` (also `:8083`)
 Encrypted vector chart server. [oexserverd](https://www.o-charts.org/) handles licensed SENC charts and serves tiles to AvNav over an internal HTTP API on port 8083. A custom Caddy build ([`config/caddy/Containerfile.xcaddy`](config/caddy/Containerfile.xcaddy)) with the [`replace-response`](https://github.com/caddyserver/replace-response) plugin rewrites the container-internal `10.88.x.x` IP addresses that the backend bakes into `avnav.xml` and tile URLs with the public host seen by the browser.
 
+#### MAC address persistence for ochartsng licensing
+The ochartsng SafeGuard license library (`libsglarm64`) fingerprints the system using the container's `eth0` MAC address. Because Podman assigns a random MAC each time a container is recreated, the fingerprint changes on every restart — which invalidates the license and breaks chart decryption.
+
+To prevent this, `install-services.sh` generates a stable random MAC once and stores it in `/etc/seabird/avnav.mac`. On subsequent installs the stored MAC is reused. The quadlet template (`config/quadlets/avnav.container`) contains the placeholder `Network=bridge:mac=__AVNAV_MAC__` which the install script replaces with the persisted value before deploying to `/etc/containers/systemd/`.
+
+**Important:** the `.oesu` chart files downloaded from the o-charts shop are encrypted for a specific system fingerprint (MAC). If the MAC ever changes (e.g. after wiping `/etc/seabird/avnav.mac` or re-flashing the device), all chart sets must be re-downloaded from the o-charts shop for the new fingerprint to apply.
+
 ---
 
 ## Data
