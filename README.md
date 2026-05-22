@@ -1,6 +1,6 @@
 # seabird
 
-**seabird** is a self-contained boat router and server running on a Raspberry Pi CM4. It bundles navigation tools, entertainment services, and system administration into a single Fedora [bootc](https://containers.github.io/bootc/) image that boots directly from eMMC and manages all services as rootless Podman containers via systemd quadlets.
+**seabird** is a self-contained boat router and server running on a Raspberry Pi CM4. It bundles navigation tools, entertainment services, and system administration into a Fedora Linux system deployed via RPM and manages all services as rootless Podman containers via systemd quadlets.
 
 The landing page (served by Caddy on port 80) links to all services. All services are reachable via sub-paths on the same host, so links work whether you connect over the LAN (`seabird.local`), Tailscale, or any other hostname.
 
@@ -45,7 +45,7 @@ A `lan-to-wan` policy allows crew clients to reach all WAN uplinks. A `--mode=de
 The CM4 carrier board exposes a cellular modem (`wwan0`) via USB. `scripts/install-ap.sh` and NetworkManager handle fallback between cellular, marina WiFi (`wlan0`), and wired ethernet (`enp4s0`). The NM dispatcher scripts in `config/nm-dispatcher/` detect captive portals and write a status JSON to `/run/seabird/` for the Caddy landing page.
 
 ### Remote access — Tailscale / Headscale
-`scripts/install-headscale.sh` installs Tailscale and optionally joins a Headscale control server. Once joined, the router is reachable at its Tailscale IP (currently `100.64.0.1`) from anywhere on the tailnet, enabling remote monitoring and administration without opening ports on the WAN firewall.
+`scripts/install-headscale.sh` installs [Tailscale](https://tailscale.com) and optionally joins a [Headscale](https://headscale.net) control server. Once joined, the router is reachable at its Tailscale IP (currently `100.64.0.1`) from anywhere on the tailnet, enabling remote monitoring and administration without opening ports on the WAN firewall.
 
 ---
 
@@ -118,15 +118,77 @@ docs/
 
 ## Image build
 
-The bootc OS image is built with the artifacts pipeline defined in `artifacts/`. The raw eMMC image is written via `scripts/flash-emmc.sh` (in the freebird workspace).
+The OS image is assembled from RPM packages. The raw eMMC image is written via `scripts/flash-emmc.sh` (in the freebird workspace).
 
 ## Deployment
 
-Services are installed onto a running seabird device by running the install scripts in `scripts/`:
+### First boot — `bootstrap.sh`
+
+Run once after flashing Fedora and cloning the repo. Installs host packages, applies the PCIe DMA overlay for the 5G modem, formats the NVMe, and deploys quadlets and firewall rules.
 
 ```bash
-ssh root@seabird.local 'bash -s' < scripts/install-services.sh
+git clone <repo-url> /opt/seabird
+cd /opt/seabird
+sudo scripts/bootstrap.sh [options]
 ```
 
-Individual component scripts can be re-run to update a single service.
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--nvme-device DEV` | `/dev/nvme0n1` | NVMe block device to use |
+| `--no-hostname` | — | Skip setting the hostname to `seabird` |
+| `--skip-storage` | — | Skip NVMe formatting (already set up) |
+| `--skip-firewall` | — | Skip firewalld configuration |
+| `--skip-services` | — | Skip quadlet deployment |
+| `--allow-wan-ssh=yes\|no` | `no` (prompt) | Open SSH on the WAN zone with fail2ban |
+
+### Full stack install — `install-all.sh`
+
+Runs all component install scripts in order and starts every service. Safe to re-run.
+
+```bash
+sudo scripts/install-all.sh [options]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--nvme-device DEV` | `/dev/nvme0n1` | NVMe block device |
+| `--hostname NAME` | `seabird` | Set static hostname |
+| `--no-hostname` | — | Skip hostname config |
+| `--allow-wan-ssh=yes\|no` | `no` | Open SSH on WAN zone |
+| `--mode=prod\|dev` | `prod` | Firewall mode — `dev` puts `end0` in the LAN zone |
+| `--batch-network` | — | Collect all network questions up front, then run non-interactively |
+| `--background` | — | Re-exec in background and log to `/var/log/seabird/install-all-<ts>.log` |
+| `--crew-ssid NAME` | (prompt) | WiFi AP SSID |
+| `--crew-password PSK` | (prompt) | WiFi AP WPA2 passphrase |
+| `--crew-ip ADDR/PREFIX` | `192.168.42.1/24` | Crew bridge IP and prefix |
+| `--crew-band bg\|a` | `bg` | WiFi band: `bg` = 2.4 GHz, `a` = 5 GHz |
+| `--crew-pihole-ip IP` | crew IP | DNS IP advertised to DHCP clients |
+| `--headscale-join=yes\|no` | (prompt) | Join Headscale network during install |
+| `--headscale-login-server URL` | — | Headscale control server URL |
+| `--headscale-auth-key KEY` | — | Headscale preauth key (implies `--headscale-join=yes`) |
+| `--skip-headscale` | — | Skip Tailscale/Headscale install entirely |
+
+**Secrets** must be populated before services will start correctly:
+
+```
+/etc/seabird/nextcloud.env
+/etc/seabird/influxdb.env
+/etc/seabird/grafana.env
+```
+
+See `/etc/seabird/*.env.example` on the device for required variables.
+
+### Individual component scripts
+
+Each install script is idempotent and can be re-run to update a single component:
+
+| Script | What it configures |
+|--------|--------------------|
+| `install-storage.sh` | NVMe partitioning and btrfs subvolumes |
+| `install-firewall.sh` | firewalld zones and masquerade (`--mode=prod\|dev`, `--allow-wan-ssh`) |
+| `install-ap.sh` | WiFi access point (`--ssid`, `--password`, `--ip`, `--band`) |
+| `install-crew-lan.sh` | Wired crew LAN port (`--iface`, `--ip`, `--pihole-ip`) |
+| `install-crew-bridge.sh` | Bridged crew LAN (wired + WiFi) |
+| `install-services.sh` | Quadlet deployment and initial service configs |
+| `install-headscale.sh` | Tailscale install and Headscale join (`--join`, `--login-server`, `--auth-key`, `--hostname`) |
 
