@@ -14,6 +14,8 @@ Pull=missing
 
 # Publish Signal-K HTTP/WS on port 3000
 PublishPort=3000:3000
+# NMEA 0183 over TCP (SignalK data connections)
+PublishPort=10110:10110
 
 # Persistent data — plugin config, vessel data, log files
 # SignalK stores runtime state under /home/node/.signalk

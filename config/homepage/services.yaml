@@ -1,9 +1,9 @@
 # Homepage services config — /srv/seabird/homepage/services.yaml
 # https://gethomepage.dev/configs/services/
 #
-# All hrefs use root-relative paths (/service) so links work regardless of
-# whether the dashboard is reached via seabird.local, Tailscale IP, or any
-# other hostname — the browser resolves them against the current origin.
+# Most hrefs use root-relative paths (/service) so links work regardless of
+# hostname. Grafana and InfluxDB intentionally use direct LAN URLs because
+# their UIs are more reliable outside of subpath proxying.
 
 - Marine:
     - Signal-K:
@@ -23,11 +23,13 @@
 
 - Data:
     - InfluxDB:
-        href: /influxdb
+        href: http://192.42.0.1:8086
+        target: _blank
         description: Time-series database
         icon: influxdb.png
     - Grafana:
-        href: /grafana
+        href: http://192.42.0.1:3001
+        target: _blank
         description: Charts & dashboards
         icon: grafana.png
         widget:
