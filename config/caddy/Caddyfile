@@ -164,7 +164,7 @@
   }
 
   # Cockpit — NOTE: requires UrlRoot=/cockpit in /etc/cockpit/cockpit.conf
-  handle_path /cockpit* {
+  handle /cockpit* {
     reverse_proxy 127.0.0.1:9090
   }
 
