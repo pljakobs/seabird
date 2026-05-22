@@ -3,7 +3,7 @@
 #
 # Creates a NetworkManager-managed Linux bridge (br-crew) and attaches:
 # - crew WiFi AP (wlp6s0)
-# - crew wired port (default: end0, USB-attached)
+# - crew wired port (default: end0, CM4 onboard ethernet)
 #
 # The bridge itself serves DHCP using NetworkManager shared mode.
 #
@@ -259,6 +259,10 @@ nmcli con modify "${NM_AP_CONN}" \
     802-11-wireless.band "${BAND}" \
     802-11-wireless.ap-isolation no \
     802-11-wireless-security.key-mgmt wpa-psk \
+    802-11-wireless-security.proto rsn \
+    802-11-wireless-security.group ccmp \
+    802-11-wireless-security.pairwise ccmp \
+    802-11-wireless-security.pmf 1 \
     802-11-wireless-security.psk "${PASSWORD}" \
     ipv4.method disabled \
     ipv6.method ignore \

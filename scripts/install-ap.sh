@@ -148,6 +148,10 @@ nmcli con add \
 nmcli con modify "${NM_CONN}" \
     802-11-wireless.band "${BAND}" \
     802-11-wireless-security.key-mgmt wpa-psk \
+    802-11-wireless-security.proto rsn \
+    802-11-wireless-security.group ccmp \
+    802-11-wireless-security.pairwise ccmp \
+    802-11-wireless-security.pmf 1 \
     802-11-wireless-security.psk "${PASSWORD}" \
     ipv4.method shared \
     ipv4.addresses "${AP_IP}" \
