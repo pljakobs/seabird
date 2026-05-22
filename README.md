@@ -1,8 +1,51 @@
 # seabird
 
-**seabird** is a self-contained boat server running on a Raspberry Pi CM4. It bundles navigation tools, entertainment services, and system administration into a single Fedora [bootc](https://containers.github.io/bootc/) image that boots directly from eMMC and manages all services as rootless Podman containers via systemd quadlets.
+**seabird** is a self-contained boat router and server running on a Raspberry Pi CM4. It bundles navigation tools, entertainment services, and system administration into a single Fedora [bootc](https://containers.github.io/bootc/) image that boots directly from eMMC and manages all services as rootless Podman containers via systemd quadlets.
 
 The landing page (served by Caddy on port 80) links to all services. All services are reachable via sub-paths on the same host, so links work whether you connect over the LAN (`seabird.local`), Tailscale, or any other hostname.
+
+---
+
+## Hardware
+
+The current implementation of seabird is based on a Raspberry Pi CM4 and the [CM4-WRT-A Router Baseboard](https://mytechcatalog.com/blog/2023/cm4-wrt-a-raspberry-pi-cm4-gigabit-router-baseboard-with-nvme-support).
+This hardware has been chosen as it provides three PCIe m.2 slots that hold 
+- an extra wifi interface
+- a 5G modem 
+- an NVMe
+
+Modem: the current version uses the T99W175 Modem which is probably not the best choice as it is know for being difficult on current Linux systems. Seabird makes a couple of adaptations to enable this modem, but I might have to make a different choice in the future.
+Changes for the T99W175:
+- enable 32Bit DMA by loading the correct overlay
+- disabling power management for the modem 
+
+The three m.2 slots share one PCIe 2 lane, so performance is relative, but good enough for the given application.
+
+## Networking
+
+seabird is the boat's router. It has multiple network interfaces and manages connectivity for the crew LAN, WAN uplinks, and remote access.
+
+### WiFi access point
+`scripts/install-ap.sh` configures `wlp6s0` as a WPA2 access point using NetworkManager `ipv4.method=shared`. NM's built-in dnsmasq instance handles DHCP and DNS for crew devices on the AP. The SSID, passphrase, IP range, and band (2.4 / 5 GHz) are configurable.
+
+### Wired crew LAN
+`scripts/install-crew-lan.sh` configures a wired crew port (default: `end0`, the USB-attached ethernet adapter) in NM shared mode, also with DHCP/DNS via dnsmasq. The onboard ethernet (`enp4s0`) is kept free for WAN use.
+
+### Firewall
+`scripts/install-firewall.sh` sets up firewalld with two zones:
+
+| Zone | Interfaces | Policy |
+|------|-----------|--------|
+| `lan` | `wlp6s0`, `enp4s0` | ACCEPT — crew clients |
+| `wan` | `wwan0`, `wlan0`, `end0` | DROP inbound, masquerade |
+
+A `lan-to-wan` policy allows crew clients to reach all WAN uplinks. A `--mode=dev` flag moves `end0` into the LAN zone for development use.
+
+### WAN uplinks
+The CM4 carrier board exposes a cellular modem (`wwan0`) via USB. `scripts/install-ap.sh` and NetworkManager handle fallback between cellular, marina WiFi (`wlan0`), and wired ethernet (`enp4s0`). The NM dispatcher scripts in `config/nm-dispatcher/` detect captive portals and write a status JSON to `/run/seabird/` for the Caddy landing page.
+
+### Remote access — Tailscale / Headscale
+`scripts/install-headscale.sh` installs Tailscale and optionally joins a Headscale control server. Once joined, the router is reachable at its Tailscale IP (currently `100.64.0.1`) from anywhere on the tailnet, enabling remote monitoring and administration without opening ports on the WAN firewall.
 
 ---
 
