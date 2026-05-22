@@ -2,10 +2,13 @@ name: Build and push Caddy image
 
 on:
   push:
-    paths:
-      - 'config/caddy/Containerfile.xcaddy'
     branches:
       - main
+    paths:
+      - '.github/workflows/build-caddy.yml'
+      - 'config/caddy/Containerfile.xcaddy'
+      - 'config/caddy/Caddyfile'
+      - 'config/quadlets/caddy.container'
   workflow_dispatch:
 
 env:
