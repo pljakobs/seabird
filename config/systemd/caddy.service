@@ -1,0 +1,15 @@
+[Unit]
+Description=Caddy reverse proxy — seabird landing page
+PartOf=seabird-services.target
+Documentation=https://caddyserver.com/docs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+ExecReload=/usr/local/bin/caddy reload --config /etc/caddy/Caddyfile --force
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=seabird-services.target default.target

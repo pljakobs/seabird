@@ -11,6 +11,11 @@ ContainerName=avnav
 AutoUpdate=registry
 Pull=missing
 
+# Keep the container network identity stable across restarts so ochartsng
+# sees the same interface MAC each time the service is recreated. The install
+# script renders the actual MAC once and stores it on the host.
+Network=bridge:mac=__AVNAV_MAC__
+
 # Persistent storage for charts, logs, tracks, and layouts
 # xfreex/avnav-stable writes runtime state under /var/lib/avnav
 Volume=/srv/seabird/avnav:/var/lib/avnav:Z

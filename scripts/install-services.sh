@@ -18,6 +18,41 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+AVNAV_MAC_FILE="/etc/seabird/avnav.mac"
+
+generate_mac() {
+    local random_bytes first_octet
+    random_bytes="$(openssl rand -hex 6)"
+    first_octet="$(( 0x${random_bytes:0:2} ))"
+    first_octet="$(( (first_octet & 0xfe) | 0x02 ))"
+    printf '%02x:%s:%s:%s:%s:%s\n' \
+        "${first_octet}" \
+        "${random_bytes:2:2}" \
+        "${random_bytes:4:2}" \
+        "${random_bytes:6:2}" \
+        "${random_bytes:8:2}" \
+        "${random_bytes:10:2}"
+}
+
+if [[ ! -f "${AVNAV_MAC_FILE}" ]]; then
+    mkdir -p "$(dirname "${AVNAV_MAC_FILE}")"
+    if [[ -f "${QUADLET_DEST}/avnav.container" ]]; then
+        existing_mac="$(grep -Eo 'Network=bridge:mac=[0-9a-f:]{17}' "${QUADLET_DEST}/avnav.container" | head -n1 | cut -d= -f3 || true)"
+        if [[ -n "${existing_mac}" ]]; then
+            printf '%s\n' "${existing_mac}" > "${AVNAV_MAC_FILE}"
+        fi
+    fi
+    if [[ ! -f "${AVNAV_MAC_FILE}" ]]; then
+        generate_mac > "${AVNAV_MAC_FILE}"
+    fi
+    chmod 0600 "${AVNAV_MAC_FILE}"
+    echo "  initialized ${AVNAV_MAC_FILE} with a stable per-host MAC"
+else
+    echo "  ${AVNAV_MAC_FILE} already exists — reusing stored MAC"
+fi
+
+AVNAV_MAC="$(tr -d '\n' < "${AVNAV_MAC_FILE}")"
+
 # ── check NVMe mounts ─────────────────────────────────────────────────────────
 
 for mp in /srv/seabird/signalk /var/log/journal /var/lib/containers; do
@@ -43,7 +78,15 @@ fi
 
 echo "Installing quadlets to ${QUADLET_DEST}..."
 mkdir -p "${QUADLET_DEST}"
-install -m 0644 "${QUADLET_SRC}"/*.container "${QUADLET_DEST}/"
+for src in "${QUADLET_SRC}"/*.container; do
+    dest="${QUADLET_DEST}/$(basename "${src}")"
+    if [[ $(basename "${src}") == "avnav.container" ]]; then
+        sed "s/__AVNAV_MAC__/${AVNAV_MAC}/g" "${src}" > "${dest}"
+        chmod 0644 "${dest}"
+    else
+        install -m 0644 "${src}" "${dest}"
+    fi
+done
 install -m 0644 "${QUADLET_SRC}"/*.pod       "${QUADLET_DEST}/" 2>/dev/null || true
 echo "  $(ls "${QUADLET_SRC}"/*.container "${QUADLET_SRC}"/*.pod 2>/dev/null | wc -l) unit files installed"
 
