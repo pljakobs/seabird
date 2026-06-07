@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly update of FreeNauticalChart DE layer for AvNav
+Documentation=https://freenauticalchart.net/download/
+Wants=network-online.target
+After=network-online.target avnav.service
+ConditionPathExists=/srv/seabird/avnav
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/seabird/avnav-fnc.env
+ExecStart=/usr/local/sbin/seabird-update-avnav-fnc-de

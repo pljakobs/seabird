@@ -25,6 +25,9 @@ Volume=/etc/caddy/conf.d:/etc/caddy/conf.d:ro,Z
 # Portal status JSON — written by NM dispatcher, served at /api/portal-status
 Volume=/run/seabird:/run/seabird:ro,Z
 
+# Homepage custom background images served directly by Caddy under /homepage-bg/
+Volume=/srv/seabird/homepage/images:/srv/seabird/homepage/images:ro,Z
+
 [Service]
 Restart=on-failure
 RestartSec=10s

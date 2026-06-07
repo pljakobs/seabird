@@ -2,8 +2,7 @@
 # https://gethomepage.dev/configs/services/
 #
 # Most hrefs use root-relative paths (/service) so links work regardless of
-# hostname. Grafana and InfluxDB intentionally use direct LAN URLs because
-# their UIs are more reliable outside of subpath proxying.
+# hostname (LAN, tailscale IP, tailscale DNS name).
 
 - Marine:
     - Signal-K:
@@ -20,16 +19,18 @@
         description: Chart server
         # No official ocharts icon; using Material Design Icons nautical chart icon
         icon: mdi-map
+    - Free Nautical Chart:
+        href: https://freenauticalchart.net/
+        description: Online nautical charts
+        icon: mdi-map-search
 
 - Data:
     - InfluxDB:
-        href: http://192.42.0.1:8086
-        target: _blank
+        href: /influxdb
         description: Time-series database
         icon: influxdb.png
     - Grafana:
-        href: http://192.42.0.1:3001
-        target: _blank
+        href: /grafana
         description: Charts & dashboards
         icon: grafana.png
         widget:
@@ -47,6 +48,16 @@
         href: /nextcloud
         description: Files & crew sync
         icon: nextcloud.png
+
+- Weather:
+    - Windy:
+        href: https://www.windy.com
+        description: Global wind and weather maps
+        icon: mdi-weather-windy
+    - Wind (Denmark):
+        href: https://www.dmi.dk/vind
+        description: DMI wind forecast for Denmark
+        icon: mdi-weather-partly-cloudy
 
 - System:
     - Pi-hole:

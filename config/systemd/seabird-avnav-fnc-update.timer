@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly schedule for FreeNauticalChart DE AvNav updates
+
+[Timer]
+OnCalendar=Sun *-*-* 03:30:00
+RandomizedDelaySec=2h
+Persistent=true
+Unit=seabird-avnav-fnc-update.service
+
+[Install]
+WantedBy=timers.target

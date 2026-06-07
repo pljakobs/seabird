@@ -583,11 +583,15 @@ fi
 
 section "7/7  Starting services"
 
-# install-services.sh already ran daemon-reload; run it once more here only
-# if services were skipped (so quadlet generator output is always fresh)
-if [[ "${SKIP_SERVICES}" == true ]]; then
-    systemctl daemon-reload
-fi
+# Install a wrapper for podman-auto-update that treats transient
+# registry/network failures as non-fatal while keeping real errors fatal.
+install -D -m 0755 "${SCRIPT_DIR}/podman-auto-update-nonfatal.sh" \
+    /usr/local/sbin/seabird-podman-auto-update-nonfatal
+install -D -m 0644 "${SCRIPT_DIR}/../config/systemd/podman-auto-update.service.d/override.conf" \
+    /etc/systemd/system/podman-auto-update.service.d/override.conf
+
+# Ensure generated units and new drop-ins are loaded.
+systemctl daemon-reload
 
 # Quadlet generator writes to /run/systemd/generator/
 GEN_DIR="/run/systemd/generator"
@@ -636,6 +640,14 @@ done
 systemctl enable --now podman-auto-update.timer
 echo "  ✓ podman-auto-update.timer"
 
+# Enable weekly FreeNauticalChart DE updates for AvNav
+if systemctl cat seabird-avnav-fnc-update.timer &>/dev/null; then
+    systemctl enable --now seabird-avnav-fnc-update.timer
+    echo "  ✓ seabird-avnav-fnc-update.timer"
+else
+    echo "  ! seabird-avnav-fnc-update.timer not found — skipping"
+fi
+
 # ── Done ──────────────────────────────────────────────────────────────────────
 
 echo
@@ -644,7 +656,7 @@ echo
 echo "  Dashboard:  http://seabird.local:3002"
 echo "  Nextcloud:  http://seabird.local:8080"
 echo "  Signal-K:   http://seabird.local:3000"
-echo "  Grafana:    http://seabird.local:3001"
+echo "  Grafana:    http://seabird.local/grafana"
 echo "  AvNav:      http://seabird.local:8088"
 echo "  Ocharts:    http://seabird.local:8083 (via Caddy proxy)"
 echo

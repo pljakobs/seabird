@@ -50,6 +50,12 @@
 
 # Landing page — links to management services and path-based service entrypoints
 :80 {
+  # Serve homepage background images from host storage.
+  handle_path /homepage-bg/* {
+    root * /srv/seabird/homepage/images
+    file_server
+  }
+
     handle /api/portal-status {
         # Serve captive-portal.json if present; 404 otherwise.
         # /run/seabird is bind-mounted into the container.
@@ -77,8 +83,13 @@
   }
 
   # Grafana — sub-path aware (GF_SERVER_SERVE_FROM_SUB_PATH=true)
-  handle_path /grafana* {
-    reverse_proxy 127.0.0.1:3001
+  # Keep the /grafana prefix when proxying (no handle_path), otherwise
+  # Grafana sees / and redirects back to /grafana/ in a loop.
+  # Rewrite absolute redirects to relative so host stays tailscale/LAN-safe.
+  handle /grafana* {
+    reverse_proxy 127.0.0.1:3001 {
+      header_down Location "^(?:https?://[^/]+)?(/grafana(?:/.*)?)$" "$1"
+    }
   }
 
   # Navidrome — sub-path aware (ND_BASEURL=/navidrome)
@@ -164,6 +175,9 @@
   }
 
   # Cockpit — NOTE: requires UrlRoot=/cockpit in /etc/cockpit/cockpit.conf
+  # Cockpit expects the trailing slash at the UrlRoot path.
+  @cockpit_noslash path /cockpit
+  redir @cockpit_noslash /cockpit/ 302
   handle /cockpit* {
     reverse_proxy 127.0.0.1:9090
   }

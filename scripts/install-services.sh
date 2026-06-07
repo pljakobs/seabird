@@ -370,10 +370,34 @@ fi
 
 echo "Installing systemd units..."
 SYSTEMD_SRC="${SCRIPT_DIR}/../config/systemd"
-for unit in seabird-nc-scan@.service seabird-nc-scan@.timer seabird-services.target; do
+for unit in \
+    seabird-nc-scan@.service \
+    seabird-nc-scan@.timer \
+    seabird-avnav-fnc-update.service \
+    seabird-avnav-fnc-update.timer \
+    seabird-services.target; do
     install -m 0644 "${SYSTEMD_SRC}/${unit}" "/etc/systemd/system/${unit}"
     echo "  /etc/systemd/system/${unit}"
 done
+
+echo "Installing AvNav chart update helper..."
+install -m 0755 "${SCRIPT_DIR}/update-avnav-fnc-de.sh" \
+    /usr/local/sbin/seabird-update-avnav-fnc-de
+mkdir -p /srv/seabird/avnav/charts/fnc
+if [[ ! -f /etc/seabird/avnav-fnc.env ]]; then
+    cat > /etc/seabird/avnav-fnc.env <<'EOF'
+# Optional overrides for seabird-update-avnav-fnc-de
+FNC_URL=https://freenauticalchart.net/download/fnc-de.mbtiles
+CHART_DIR=/srv/seabird/avnav/charts/fnc
+TARGET_FILE=/srv/seabird/avnav/charts/fnc/fnc-de.mbtiles
+# Reject obviously broken downloads (bytes)
+MIN_BYTES=50000000
+EOF
+    chmod 0644 /etc/seabird/avnav-fnc.env
+    echo "  /etc/seabird/avnav-fnc.env created"
+else
+    echo "  /etc/seabird/avnav-fnc.env already exists — skipping"
+fi
 
 # ── Docker Hub credentials for systemd services ──────────────────────────────
 # systemd services run without XDG_RUNTIME_DIR so they cannot find credentials
