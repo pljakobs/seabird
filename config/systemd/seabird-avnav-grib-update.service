@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodic GRIB weather overlay update for AvNav
+Documentation=https://nomads.ncep.noaa.gov/
+Wants=network-online.target
+After=network-online.target avnav.service
+ConditionPathExists=/srv/seabird/avnav
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/seabird/avnav-grib.env
+ExecStart=/usr/local/sbin/seabird-update-avnav-grib-overlay

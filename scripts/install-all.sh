@@ -648,6 +648,14 @@ else
     echo "  ! seabird-avnav-fnc-update.timer not found — skipping"
 fi
 
+# Enable periodic GRIB weather overlay updates for AvNav
+if systemctl cat seabird-avnav-grib-update.timer &>/dev/null; then
+    systemctl enable --now seabird-avnav-grib-update.timer
+    echo "  ✓ seabird-avnav-grib-update.timer"
+else
+    echo "  ! seabird-avnav-grib-update.timer not found — skipping"
+fi
+
 # ── Done ──────────────────────────────────────────────────────────────────────
 
 echo

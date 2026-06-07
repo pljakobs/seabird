@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule periodic GRIB weather overlay updates for AvNav
+
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:20:00
+RandomizedDelaySec=45m
+Persistent=true
+Unit=seabird-avnav-grib-update.service
+
+[Install]
+WantedBy=timers.target

@@ -375,6 +375,8 @@ for unit in \
     seabird-nc-scan@.timer \
     seabird-avnav-fnc-update.service \
     seabird-avnav-fnc-update.timer \
+    seabird-avnav-grib-update.service \
+    seabird-avnav-grib-update.timer \
     seabird-services.target; do
     install -m 0644 "${SYSTEMD_SRC}/${unit}" "/etc/systemd/system/${unit}"
     echo "  /etc/systemd/system/${unit}"
@@ -383,7 +385,10 @@ done
 echo "Installing AvNav chart update helper..."
 install -m 0755 "${SCRIPT_DIR}/update-avnav-fnc-de.sh" \
     /usr/local/sbin/seabird-update-avnav-fnc-de
+install -m 0755 "${SCRIPT_DIR}/update-avnav-grib-overlay.sh" \
+    /usr/local/sbin/seabird-update-avnav-grib-overlay
 mkdir -p /srv/seabird/avnav/charts/fnc
+mkdir -p /srv/seabird/avnav/charts/weather
 if [[ ! -f /etc/seabird/avnav-fnc.env ]]; then
     cat > /etc/seabird/avnav-fnc.env <<'EOF'
 # Optional overrides for seabird-update-avnav-fnc-de
@@ -397,6 +402,31 @@ EOF
     echo "  /etc/seabird/avnav-fnc.env created"
 else
     echo "  /etc/seabird/avnav-fnc.env already exists — skipping"
+fi
+
+if [[ ! -f /etc/seabird/avnav-grib.env ]]; then
+    cat > /etc/seabird/avnav-grib.env <<'EOF'
+# Optional overrides for seabird-update-avnav-grib-overlay
+# MODEL currently supports: gfs
+MODEL=gfs
+# Forecast horizon in hours (3 digits), e.g. 000, 003, 006
+FORECAST_HOUR=003
+# Crop to German Baltic Sea area: lon_min,lat_min,lon_max,lat_max
+BBOX=8.0,53.0,16.5,60.0
+# GRIB band index from gdalinfo output (1-based)
+BAND_INDEX=1
+# MBTiles zoom range
+MINZOOM=4
+MAXZOOM=8
+CHART_DIR=/srv/seabird/avnav/charts/weather
+TARGET_FILE=/srv/seabird/avnav/charts/weather/grib-overlay.mbtiles
+# Reject obviously broken downloads (bytes)
+MIN_BYTES=100000
+EOF
+    chmod 0644 /etc/seabird/avnav-grib.env
+    echo "  /etc/seabird/avnav-grib.env created"
+else
+    echo "  /etc/seabird/avnav-grib.env already exists — skipping"
 fi
 
 # ── Docker Hub credentials for systemd services ──────────────────────────────

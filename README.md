@@ -59,6 +59,8 @@ Signal-K's admin SPA issues several root-level requests (for example `/plugins` 
 ### AvNav — `/avnav`
 Chart plotter and navigation interface. Runs [AvNav](https://github.com/wellenvogel/avnav) on port 8088 (proxied from `/avnav`). AvNav reads live position and instrument data from Signal-K and renders raster and vector charts in the browser.
 
+GRIB weather overlays can be generated into MBTiles for AvNav via the helper script `scripts/update-avnav-grib-overlay.sh` and the timer `seabird-avnav-grib-update.timer`. Defaults are configured in `/etc/seabird/avnav-grib.env` (model, forecast hour, bbox, band index, zoom levels).
+
 ### Ocharts — `/ocharts` (also `:8083`)
 Encrypted vector chart server. [oexserverd](https://www.o-charts.org/) handles licensed SENC charts and serves tiles to AvNav over an internal HTTP API on port 8083. A custom Caddy build ([`config/caddy/Containerfile.xcaddy`](config/caddy/Containerfile.xcaddy)) with the [`replace-response`](https://github.com/caddyserver/replace-response) plugin rewrites the container-internal `10.88.x.x` IP addresses that the backend bakes into `avnav.xml` and tile URLs with the public host seen by the browser.
 

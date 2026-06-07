@@ -178,6 +178,7 @@ Signal-K routing note: `/signalk` on Caddy is kept for discovery/API paths, but 
 2. Signal-K ingests UDP stream
 3. Signal-K → InfluxDB via plugin
 4. Grafana reads InfluxDB for dashboards
+5. GRIB weather data is fetched on schedule and converted to MBTiles overlays for AvNav (`seabird-avnav-grib-update.timer` + `seabird-update-avnav-grib-overlay`)
 
 ### 5.3 Start Order
 ```
