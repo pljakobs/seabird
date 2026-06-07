@@ -115,25 +115,19 @@
     }
   }
 
-  # Signal-K — /signalk is the discovery document; redirect to UI.
-  @signalk_root path /signalk /signalk/
-  redir @signalk_root /signalk/admin/ 302
+  # Signal-K admin — redirect to SignalK's native port 3000.
+  # The admin SPA makes root-level API calls (/plugins, /webapps, /appstore/*)
+  # that conflict with AvNav's root-relative paths when served via port 80.
+  # Routing by Referer header is unreliable because SignalK's Helmet middleware
+  # sets 'Referrer-Policy: no-referrer' and the SPA's fetch() calls may also
+  # set referrerPolicy:'no-referrer' explicitly.
+  # Port 3000 is published on all interfaces (PublishPort=3000:3000) so the
+  # browser can reach it directly — no routing conflict possible.
+  @signalk_root path /signalk /signalk/ /signalk/admin /signalk/admin/
+  redir @signalk_root http://{http.request.host}:3000/admin/ 302
 
-  # Signal-K admin UI is mounted at /admin on the backend.
-  # Strip only /signalk (not /signalk/admin), so:
-  #   /signalk/admin/... -> /admin/...
-  # Override SignalK's Helmet 'Referrer-Policy: no-referrer' so the browser
-  # sends a Referer header on the SPA's sub-requests — required for the
-  # @signalk_admin_api matcher below to work correctly.
-  handle /signalk/admin* {
-    uri strip_prefix /signalk
-    reverse_proxy 127.0.0.1:3000 {
-      # Backend may redirect to /admin (or absolute http://host/admin).
-      # Keep client-visible URLs inside the /signalk prefix.
-      header_down Location "^(?:https?://[^/]+)?(/admin(?:/.*)?)$" "/signalk$1"
-      header_down Referrer-Policy "strict-origin-when-cross-origin"
-    }
-  }
+  @signalk_admin_redir path_regexp sk_admin ^/signalk(/admin/.+)$
+  redir @signalk_admin_redir http://{http.request.host}:3000{http.regexp.sk_admin.1} 302
 
   # Keep /signalk prefix when proxying. Signal-K API/UI paths are rooted at
   # /signalk/v1/... and /signalk/admin/.
@@ -157,18 +151,6 @@
       # AvNav can redirect to root-relative paths; keep them under /avnav.
       header_down Location "^(?:https?://[^/]+)?(/.*)$" "/avnav$1"
     }
-  }
-
-  # SignalK admin SPA (loaded from /signalk/admin/) makes unqualified root-level
-  # API calls: /plugins, /plugins/*, /webapps, /appstore/*, /restart etc.
-  # These must reach SignalK (3000) before the catch-all AvNav blocks below.
-  # AvNav's own /plugins/* uses a different Referer, so disambiguate by origin.
-  @signalk_admin_api {
-    path /plugins /plugins/* /webapps /webapps/* /appstore /appstore/* /restart
-    header Referer *signalk*
-  }
-  handle @signalk_admin_api {
-    reverse_proxy 127.0.0.1:3000
   }
 
   # AvNav emits root-relative URLs for its static assets and WebSocket.

@@ -51,8 +51,10 @@ The CM4 carrier board exposes a cellular modem (`wwan0`) via USB. `scripts/insta
 
 ## Marine
 
-### Signal-K — `/signalk`
+### Signal-K — `/signalk` (API/discovery) and `:3000/admin` (admin UI)
 Central marine data hub. Aggregates NMEA 0183 / NMEA 2000 instrument data (GPS, AIS, wind, depth, engine) and exposes it over the Signal-K WebSocket/REST API for other services and apps to consume.
+
+Signal-K's admin SPA issues several root-level requests (for example `/plugins` and `/webapps`) that collide with other services when proxied under `:80`. For reliability, Caddy redirects `/signalk/admin` to `http://<host>:3000/admin/`, where the admin UI and plugin/webapp management run natively.
 
 ### AvNav — `/avnav`
 Chart plotter and navigation interface. Runs [AvNav](https://github.com/wellenvogel/avnav) on port 8088 (proxied from `/avnav`). AvNav reads live position and instrument data from Signal-K and renders raster and vector charts in the browser.

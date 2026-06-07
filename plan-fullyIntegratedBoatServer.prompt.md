@@ -171,6 +171,8 @@ Goal: deploy marine data and collaboration stack with clear dependencies.
 
 Quadlet files in `config/quadlets/`. Deployed by `scripts/install-services.sh`.
 
+Signal-K routing note: `/signalk` on Caddy is kept for discovery/API paths, but the admin UI is redirected to `http://<host>:3000/admin/`. This avoids collisions with other root-level paths on `:80` (notably `/plugins/*` used by AvNav) and keeps Signal-K plugin/webapp management functional.
+
 ### 5.2 Data Flow
 1. ESP32 reads NMEA2000 and emits UDP stream
 2. Signal-K ingests UDP stream
