@@ -137,12 +137,34 @@
     reverse_proxy 127.0.0.1:3000
   }
 
+  # SignalK webapps/plugins can expose root-level paths like /@signalk/... and
+  # /signalk-foo/...; route those to SignalK so they do not fall through to
+  # Homepage.
+  handle /@signalk* {
+    reverse_proxy 127.0.0.1:3000
+  }
+  handle /signalk-* {
+    reverse_proxy 127.0.0.1:3000
+  }
+
   # AvNav — strip prefix, serves from root
   handle_path /avnav* {
     reverse_proxy 127.0.0.1:8088 {
       # AvNav can redirect to root-relative paths; keep them under /avnav.
       header_down Location "^(?:https?://[^/]+)?(/.*)$" "/avnav$1"
     }
+  }
+
+  # SignalK admin SPA (loaded from /signalk/admin/) makes unqualified root-level
+  # API calls: /plugins, /plugins/*, /webapps, /appstore/*, /restart etc.
+  # These must reach SignalK (3000) before the catch-all AvNav blocks below.
+  # AvNav's own /plugins/* uses a different Referer, so disambiguate by origin.
+  @signalk_admin_api {
+    path /plugins /plugins/* /webapps /webapps/* /appstore /appstore/* /restart
+    header Referer *signalk*
+  }
+  handle @signalk_admin_api {
+    reverse_proxy 127.0.0.1:3000
   }
 
   # AvNav emits root-relative URLs for its static assets and WebSocket.
