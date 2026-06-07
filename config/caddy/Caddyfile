@@ -122,12 +122,16 @@
   # Signal-K admin UI is mounted at /admin on the backend.
   # Strip only /signalk (not /signalk/admin), so:
   #   /signalk/admin/... -> /admin/...
+  # Override SignalK's Helmet 'Referrer-Policy: no-referrer' so the browser
+  # sends a Referer header on the SPA's sub-requests — required for the
+  # @signalk_admin_api matcher below to work correctly.
   handle /signalk/admin* {
     uri strip_prefix /signalk
     reverse_proxy 127.0.0.1:3000 {
       # Backend may redirect to /admin (or absolute http://host/admin).
       # Keep client-visible URLs inside the /signalk prefix.
       header_down Location "^(?:https?://[^/]+)?(/admin(?:/.*)?)$" "/signalk$1"
+      header_down Referrer-Policy "strict-origin-when-cross-origin"
     }
   }
 
