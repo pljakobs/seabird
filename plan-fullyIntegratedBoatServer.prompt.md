@@ -46,7 +46,7 @@
 
 ### 1.2 Fedora Host Packages (baseline — install via dnf)
 ```
-linux-firmware NetworkManager firewalld caddy
+linux-firmware NetworkManager firewalld caddy gdal
 iw wpa_supplicant ethtool iproute
 podman
 libqmi libmbim ModemManager
@@ -145,7 +145,7 @@ Goal: all configuration is in git; services updated via `podman auto-update`.
 |--------|---------|
 | `install-storage.sh` | Format NVMe, create btrfs subvolumes, write fstab |
 | `install-firewall.sh` | Deploy firewalld zones, captive portal dispatcher, Caddy |
-| `install-services.sh` | Deploy quadlets, create data dirs, write env stubs |
+| `install-services.sh` | Deploy quadlets, weather updater/API scripts, AvNav weather panel (`user.js`), create data dirs, write env stubs |
 
 ### 4.3 Update Strategy
 - `systemctl enable podman-auto-update.timer` — daily pulls new image digests
@@ -178,7 +178,65 @@ Signal-K routing note: `/signalk` on Caddy is kept for discovery/API paths, but 
 2. Signal-K ingests UDP stream
 3. Signal-K → InfluxDB via plugin
 4. Grafana reads InfluxDB for dashboards
-5. GRIB weather data is fetched on schedule and converted to MBTiles overlays for AvNav (`seabird-avnav-grib-update.timer` + `seabird-update-avnav-grib-overlay`)
+5. Weather model data is fetched on schedule and converted to MBTiles overlays for AvNav: ICON-D2 for atmospheric layers, DMI WAM for waves, and DMI DKSS for currents (with EWAM/CMEMS fallback paths) via `seabird-avnav-grib-update.timer` + `seabird-update-avnav-grib-overlay`.
+
+### 5.5 Weather Overlay Pipeline (GRIB → MBTiles)
+
+**Script:** `scripts/update-avnav-grib-overlay.sh`  
+**Deployed to:** `/usr/local/sbin/seabird-update-avnav-grib-overlay`  
+**Triggered by:** `seabird-avnav-grib-update.timer` (systemd)  
+**Config:** `/etc/seabird/avnav-grib.env` (env file, not edited manually)
+
+#### Data sources
+| Layer | Source | Variable |
+|-------|--------|---------|
+| `wind_style` | DWD ICON-D2 | U/V 10m wind → colour scale + barbs |
+| `wave_style` | DMI WAM (primary), DWD EWAM (fallback) | significant wave height + mean wave direction arrows |
+| `current_style` | DMI DKSS (primary), CMEMS (fallback) | surface current arrows (U/V) |
+| `temperature_2m` | DWD ICON-D2 | optional 2m temperature |
+| `precipitation_total` | DWD ICON-D2 | optional total precipitation |
+| `pressure_msl` | DWD ICON-D2 | optional mean sea-level pressure |
+
+Rendering now runs in 1-hour steps for +1h to +48h by default and publishes each hour incrementally so AvNav can use freshly completed layers before the full cycle ends.
+
+#### Wind overlay detail (`wind_style`)
+Produces two MBTiles:
+- `weather-wind-speed-kts.mbtiles` — colour-coded wind speed
+  - Dark blue: < 6 kt, green: 6–16 kt, orange: ~25 kt, red: ≥ 30 kt (via `gdal_calc.py` + `gdaldem color-relief`)
+- `weather-wind-barbs.mbtiles` — wind barb symbols rendered with matplotlib onto transparent tiles
+
+#### AvNav integration
+- All MBTiles must live at the **top level** of `/srv/seabird/avnav/charts/` — AvNav's chart scanner is non-recursive
+- Naming convention: `weather-<name>.mbtiles` (controlled by `WEATHER_PREFIX=weather-` env)
+- After generation the script restarts `avnav.service` to trigger re-index
+
+#### Host dependencies (required; installed by `scripts/bootstrap.sh`)
+```
+gdal  gdal-python-tools  python3-gdal  python3-numpy  python3-matplotlib
+```
+Note: `gdal_calc.py` is provided by `gdal-python-tools`, **not** `python3-gdal`.
+
+#### Key env vars (tunable in `/etc/seabird/avnav-grib.env`)
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `LAYERS` | `wind_style,wave_style,current_style` | comma-separated |
+| `FORECAST_HOURS` | `001..048` | 1-hourly forecast steps (48h horizon) |
+| `MINZOOM` | `9` | effective min zoom in produced MBTiles |
+| `MAXZOOM` | `12` | effective max zoom |
+| `ZOOM_MIN_LIMIT` | `6` | safety floor — MINZOOM is clamped up to this |
+| `ZOOM_MAX_LIMIT` | `12` | safety ceiling — MAXZOOM is clamped down to this |
+| `OVERZOOM_MAX_EXTRA_LEVELS` | `4` | if native tiles are lower-res, synthesise up to N extra zoom levels by tile-splitting |
+| `LAYER_PARALLEL_WORKERS` | `auto` | per-hour layer fan-out; auto-sized by CPU and available memory |
+| `WIND_BARB_WORKERS` | `3` | zoom-level workers for wind/wave/current symbol rendering |
+| `WIND_BARB_STEP` | `24` | source-pixel spacing between barb symbols |
+| `WIND_BARB_RENDER_SCALE` | `8` | render resolution multiplier for barb raster (higher = crisper) |
+| `BBOX` | `8.0,53.0,16.5,60.0` | lon_min,lat_min,lon_max,lat_max (German Baltic) |
+
+#### Lessons learned / gotchas
+- AvNav MBTiles metadata `minzoom`/`maxzoom` must match the actual tile pyramid; the script rewrites both after tile generation
+- The barb raster is rendered at `WIND_BARB_RENDER_SCALE × 100 dpi` then sliced into MBTiles; a scale of 3 fits comfortably on the constrained root filesystem (91% used); higher scales cause SQLite I/O errors if `/` fills
+- The root filesystem (`/dev/mapper/systemVG-LVRoot`, ~13 GB) is at 91% usage — large temporary rasters write to `/var/tmp` (on NVMe) but intermediate GDAL outputs and MBTiles temp files also touch `/`; keep `WIND_BARB_RENDER_SCALE` ≤ 4 until the root volume is expanded
+- Prior OOM incidents on Pi CM4 were mitigated by bounded layer concurrency and strip-based symbol rendering; do not raise `LAYER_PARALLEL_WORKERS` aggressively without checking memory headroom.
 
 ### 5.3 Start Order
 ```

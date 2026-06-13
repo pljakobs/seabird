@@ -81,7 +81,7 @@ AVNAV_MAC="$(tr -d '\n' < "${AVNAV_MAC_FILE}")"
 
 # ── check NVMe mounts ─────────────────────────────────────────────────────────
 
-for mp in /srv/seabird/signalk /var/log/journal /var/lib/containers; do
+for mp in /srv/seabird/signalk /srv/seabird/avnav /srv/seabird/homepage /var/log/journal /var/lib/containers; do
     if ! mountpoint -q "${mp}"; then
         echo "error: ${mp} is not mounted — run install-storage.sh first" >&2
         exit 1
@@ -377,6 +377,7 @@ for unit in \
     seabird-avnav-fnc-update.timer \
     seabird-avnav-grib-update.service \
     seabird-avnav-grib-update.timer \
+    seabird-weather-api.service \
     seabird-services.target; do
     install -m 0644 "${SYSTEMD_SRC}/${unit}" "/etc/systemd/system/${unit}"
     echo "  /etc/systemd/system/${unit}"
@@ -387,8 +388,15 @@ install -m 0755 "${SCRIPT_DIR}/update-avnav-fnc-de.sh" \
     /usr/local/sbin/seabird-update-avnav-fnc-de
 install -m 0755 "${SCRIPT_DIR}/update-avnav-grib-overlay.sh" \
     /usr/local/sbin/seabird-update-avnav-grib-overlay
+install -m 0755 "${SCRIPT_DIR}/seabird-weather-api.py" \
+    /usr/local/sbin/seabird-weather-api
 mkdir -p /srv/seabird/avnav/charts/fnc
-mkdir -p /srv/seabird/avnav/charts/weather
+mkdir -p /srv/seabird/avnav/user/viewer
+install -m 0644 "${CONFIG_SRC}/avnav/user.js" \
+    /srv/seabird/avnav/user/viewer/user.js
+# Weather MBTiles go at the top level of charts/ so AvNav's non-recursive
+# scanner can discover them.
+chcon -Rt container_file_t /srv/seabird/avnav/charts 2>/dev/null || true
 if [[ ! -f /etc/seabird/avnav-fnc.env ]]; then
     cat > /etc/seabird/avnav-fnc.env <<'EOF'
 # Optional overrides for seabird-update-avnav-fnc-de
@@ -407,26 +415,63 @@ fi
 if [[ ! -f /etc/seabird/avnav-grib.env ]]; then
     cat > /etc/seabird/avnav-grib.env <<'EOF'
 # Optional overrides for seabird-update-avnav-grib-overlay
-# MODEL currently supports: gfs
-MODEL=gfs
-# Forecast horizon in hours (3 digits), e.g. 000, 003, 006
+# Atmospheric model currently supports: icon-d2
+MODEL=icon-d2
+# Atmospheric forecast horizon in hours (3 digits), e.g. 000, 003, 006
 FORECAST_HOUR=003
+# Wave model currently supports: ewam
+WAVE_MODEL=ewam
+# Wave forecast horizon in hours (3 digits)
+WAVE_FORECAST_HOUR=003
+# Forecast steps to render each run (default: +1h..+48h hourly)
+FORECAST_HOURS=001,002,003,004,005,006,007,008,009,010,011,012,013,014,015,016,017,018,019,020,021,022,023,024,025,026,027,028,029,030,031,032,033,034,035,036,037,038,039,040,041,042,043,044,045,046,047,048
+# Comma-separated overlay set
+# wind_style creates weather-wind-speed-kts + weather-wind-barbs
+LAYERS=wind_style,wave_style,current_style
 # Crop to German Baltic Sea area: lon_min,lat_min,lon_max,lat_max
 BBOX=8.0,53.0,16.5,60.0
-# GRIB band index from gdalinfo output (1-based)
-BAND_INDEX=1
-# MBTiles zoom range
-MINZOOM=4
-MAXZOOM=8
-CHART_DIR=/srv/seabird/avnav/charts/weather
-TARGET_FILE=/srv/seabird/avnav/charts/weather/grib-overlay.mbtiles
+# MBTiles zoom range (clamped by updater to ZOOM_MIN_LIMIT..ZOOM_MAX_LIMIT)
+MINZOOM=10
+MAXZOOM=12
+# Safety bounds for zoom configuration on constrained hardware
+ZOOM_MIN_LIMIT=6
+ZOOM_MAX_LIMIT=12
+# If requested zoom is above native data resolution, synthesize at most this
+# many extra zoom levels by overzooming existing tiles.
+OVERZOOM_MAX_EXTRA_LEVELS=4
+# AvNav scanner is non-recursive, so MBTiles must live at the top level
+CHART_DIR=/srv/seabird/avnav/charts
+WEATHER_PREFIX=weather-
+# Wind barb spacing in source pixels (higher = fewer symbols)
+WIND_BARB_STEP=24
+# Render scale factor for barb raster generation (higher = crisper at high zoom,
+# but larger files and more CPU)
+WIND_BARB_RENDER_SCALE=8
+# Per-hour layer fan-out. Use auto for CPU+memory-based sizing.
+LAYER_PARALLEL_WORKERS=auto
+# Zoom-level symbol render workers (wind/waves/currents)
+WIND_BARB_WORKERS=3
 # Reject obviously broken downloads (bytes)
-MIN_BYTES=100000
+MIN_BYTES=50000
+# SIGMET is not enabled by default: DWD CAP alerts exist, but no ready-made
+# SIGMET overlay feed is wired into this updater yet.
 EOF
     chmod 0644 /etc/seabird/avnav-grib.env
     echo "  /etc/seabird/avnav-grib.env created"
 else
     echo "  /etc/seabird/avnav-grib.env already exists — skipping"
+fi
+
+# Migrate any existing weather MBTiles from the old subdirectory to top-level
+if [[ -d /srv/seabird/avnav/charts/weather ]]; then
+    for f in /srv/seabird/avnav/charts/weather/*.mbtiles; do
+        [[ -f "${f}" ]] || continue
+        base="$(basename "${f}")"
+        dest="/srv/seabird/avnav/charts/weather-${base}"
+        [[ -f "${dest}" ]] || mv -f "${f}" "${dest}"
+    done
+    rmdir /srv/seabird/avnav/charts/weather 2>/dev/null || true
+    echo "  migrated weather MBTiles to top-level charts directory"
 fi
 
 # ── Docker Hub credentials for systemd services ──────────────────────────────
@@ -578,6 +623,11 @@ echo ""
 echo "Reloading systemd (quadlet generator)..."
 systemctl daemon-reload
 
+if ! systemctl is-enabled seabird-weather-api.service &>/dev/null; then
+    systemctl enable seabird-weather-api.service
+    echo "  enabled seabird-weather-api.service"
+fi
+
 echo ""
 echo "Services installed."
 echo "Start/stop/restart all services:"
@@ -586,7 +636,7 @@ echo "  systemctl stop    seabird-services.target"
 echo "  systemctl restart seabird-services.target"
 echo ""
 echo "Or individually:"
-echo "  systemctl start caddy influxdb signalk grafana nextcloud-pod homepage pihole navidrome avnav"
+echo "  systemctl start caddy influxdb signalk grafana nextcloud-pod homepage pihole navidrome avnav seabird-weather-api"
 echo ""
 echo "Add crew users with:"
 echo "  scripts/add-user.sh <username>"
