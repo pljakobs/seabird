@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seabird Passage Weather</title>
+<style>
+:root{--ink:#18252a;--muted:#536368;--line:#c9d4d5;--sea:#14614e;--alert:#a53527}
+*{box-sizing:border-box;letter-spacing:0}body{margin:0;color:var(--ink);background:#f5f8f8;font:16px 'Trebuchet MS',sans-serif}header{padding:18px 24px;border-bottom:1px solid var(--line);background:#e3eeeb}h1{font:600 26px Georgia,serif;margin:0}main{max-width:1200px;margin:auto;padding:24px}section{padding:18px 0;border-bottom:1px solid var(--line)}h2{font-size:18px;margin:0 0 14px}.controls{display:flex;flex-wrap:wrap;gap:14px;align-items:end}label{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}input,select,button{font:inherit;min-height:40px;border:1px solid var(--line);border-radius:4px;padding:7px 10px;max-width:100%}input[type=number]{width:130px}input[type=checkbox]{min-height:20px}button{background:var(--sea);color:white;cursor:pointer}button:disabled{opacity:.5;cursor:wait}.status{margin-top:14px;line-height:1.5;overflow-wrap:anywhere}.error{color:var(--alert)}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}th{color:var(--muted)}small{color:var(--muted)}a{color:var(--sea)}.check{flex-direction:row;align-items:center}@media(max-width:600px){main{padding:12px}header{padding:16px}input[type=datetime-local]{width:100%}.controls>label{flex:1 1 140px}}
+</style>
+</head>
+<body>
+<header><h1>Passage Weather</h1><button id="open-chart">Open AvNav</button></header>
+<main>
+<div id="availability" class="status" role="status">Loading forecast</div>
+<section><h2>Forecast</h2><div class="controls">
+<label>Valid time (UTC)<select id="time"></select></label>
+<label>Layer<select id="layer"></select></label>
+<label class="check"><input type="checkbox" id="enabled" checked>Map overlay</label>
+<a id="geojson" download="forecast.geojson">GeoJSON</a>
+</div><div id="runs" class="status"></div></section>
+<section><h2>Point Forecast</h2><div class="controls">
+<label>Longitude<input id="lon" type="number" step="0.01" min="-180" max="180"></label>
+<label>Latitude<input id="lat" type="number" step="0.01" min="-90" max="90"></label>
+<button id="point">Check Point</button><button id="boat">Boat Position</button>
+</div><div id="point-result" class="status" role="status"></div></section>
+<section><h2>Passage Forecast</h2><div class="controls">
+<label>AvNav route<select id="route"></select></label>
+<label>Departure (UTC)<input id="departure" type="datetime-local" required></label>
+<label>Speed over ground (kn)<input id="speed" type="number" min="0.5" max="60" step="0.5" value="5"></label>
+<label>Compare departure (UTC)<input id="compare" type="datetime-local"></label>
+<button id="passage">Check Passage</button>
+<button id="show-route">Show in AvNav</button><button id="clear-route">Clear Passage Overlay</button>
+</div><div id="passage-status" class="status" role="status"></div>
+<div class="table-wrap"><table><thead><tr><th>Point</th><th>Distance (nm)</th><th>ETA (UTC)</th><th>Wind (kn / from)</th><th>Waves (m / from)</th><th>Current (kn / to)</th></tr></thead><tbody id="samples"></tbody></table></div>
+<div id="comparison" class="status"></div>
+<p><small>Fixed-speed ETAs. Nearest coarse grid cell and time interpolation. Missing forecast values are shown as --. Not automatic routing; no polar, tide or navigation-safety corrections.</small></p>
+</section>
+</main>
+<script type="module">
+import {request, apiBase, escape, selection, saveSelection, summary, passageSelection, savePassage, openWeatherChart} from './weather.mjs';
+const element = id => document.getElementById(id);
+const display = (id, message, error = false) => {
+    element(id).textContent = message;
+    element(id).classList.toggle('error', error);
+};
+let meta;
+element('open-chart').onclick = async () => {
+    try { await openWeatherChart(); }
+    catch (error) { display('availability', error.message, true); }
+};
+if (new URL(window.location.href).searchParams.get('chart') === '1') {
+    await element('open-chart').onclick();
+}
+const choice = () => ({layer: element('layer').value, time: element('time').value, enabled: element('enabled').checked});
+function updateTimes(savedTime) {
+    const times = meta.products[element('layer').value].times;
+    element('time').innerHTML = times.map(time => `<option value="${time}">${escape(time.replace('T',' ').replace('Z',' UTC'))}</option>`).join('');
+    if (times.includes(savedTime)) element('time').value = savedTime;
+    else element('time').value = times.find(time => Date.parse(time) >= Date.now()) || times.at(-1);
+}
+function updateSelection() {
+    saveSelection(choice());
+    const url = new URL('overlay', apiBase());
+    url.searchParams.set('time', element('time').value);
+    url.searchParams.set('layer', element('layer').value);
+    element('geojson').href = url.href;
+    display('point-result', '');
+}
+async function busy(id, action) {
+    element(id).disabled = true;
+    try { await action(); } finally { element(id).disabled = false; }
+}
+async function point(boat) {
+    await busy(boat ? 'boat' : 'point', async () => {
+        try {
+            if (!boat && (!element('lon').value || !element('lat').value)) throw new Error('Enter longitude and latitude');
+            const values = {time: element('time').value};
+            if (!boat) Object.assign(values, {lon: element('lon').value, lat: element('lat').value});
+            const result = await request('point', values);
+            element('lon').value = result.lon;
+            element('lat').value = result.lat;
+            display('point-result', `${result.valid} | ${summary(result.products)}`);
+        } catch (error) { display('point-result', error.message, true); }
+    });
+}
+const utcInput = value => {
+    if (!value) throw new Error('Choose a departure time in UTC');
+    return `${value}:00Z`;
+};
+const value = number => Number.isFinite(number) ? number.toFixed(1) : '--';
+const pair = (product, key) => `${value(product?.[key])} / ${value(product?.direction_deg)}`;
+const routeSummary = result => {
+    const max = (name, field) => {
+        const numbers = result.samples.map(sample => sample.products[name]?.[field]).filter(Number.isFinite);
+        return numbers.length ? Math.max(...numbers) : undefined;
+    };
+    const missing = result.samples.filter(sample => !sample.products.wind?.speed_kn && sample.products.wind?.speed_kn !== 0).length;
+    return `${result.departure}: ${result.distance_nm} nm; arrival ${result.arrival}; max wind ${value(max('wind','speed_kn'))} kn; max waves ${value(max('waves','height_m'))} m; ${missing} samples without wind coverage`;
+};
+const passageValues = () => {
+    if (!element('route').value) throw new Error('Save a GPX route in AvNav first');
+    return {name: element('route').value, speed: element('speed').value, time: utcInput(element('departure').value)};
+};
+element('show-route').onclick = () => busy('show-route', async () => {
+    try {
+        const values = passageValues();
+        await request('route', values);
+        savePassage(values);
+        saveSelection({...choice(), enabled: true});
+        await openWeatherChart();
+    } catch (error) { display('passage-status', error.message, true); }
+});
+element('clear-route').onclick = () => {
+    savePassage(null);
+    display('passage-status', 'Passage overlay cleared');
+};
+element('point').onclick = () => point(false);
+element('boat').onclick = () => point(true);
+element('layer').onchange = () => { updateTimes(element('time').value); updateSelection(); };
+element('time').onchange = updateSelection;
+element('enabled').onchange = updateSelection;
+element('passage').onclick = () => busy('passage', async () => {
+    element('samples').replaceChildren();
+    display('comparison', '');
+    try {
+        const values = passageValues();
+        const result = await request('route', values);
+        display('passage-status', routeSummary(result));
+        element('samples').innerHTML = result.samples.map(sample => `<tr><td>${escape(sample.name)}</td><td>${sample.distance_nm}</td><td>${escape(sample.valid.replace('T',' ').replace('Z',''))}</td><td>${pair(sample.products.wind,'speed_kn')}</td><td>${pair(sample.products.waves,'height_m')}</td><td>${pair(sample.products.currents,'speed_kn')}</td></tr>`).join('');
+        if (element('compare').value) {
+            const comparison = await request('route', {...values, time: utcInput(element('compare').value)});
+            display('comparison', `Alternative: ${routeSummary(comparison)}`);
+        }
+    } catch (error) { display('passage-status', error.message, true); }
+});
+try {
+    meta = await request('meta');
+    const saved = selection(meta);
+    element('layer').innerHTML = Object.keys(meta.products).map(layer => `<option>${escape(layer)}</option>`).join('');
+    element('layer').value = saved.layer;
+    element('enabled').checked = saved.enabled;
+    updateTimes(saved.time);
+    updateSelection();
+    element('departure').value = element('time').value.slice(0,16);
+    display('availability', `Downloaded ${meta.downloaded}; age ${meta.age_hours} h${meta.stale ? ' - STALE' : ''}. ${meta.warnings.join('; ')}`, meta.stale || meta.warnings.length > 0);
+    display('runs', Object.entries(meta.products).map(([name, product]) => `${name}: run ${product.run}; ${product.times[0]} to ${product.times.at(-1)}${product.expired ? ' EXPIRED' : ''}`).join(' | '));
+} catch (error) {
+    display('availability', error.message, true);
+    ['point','boat','passage','show-route'].forEach(id => { element(id).disabled = true; });
+}
+try {
+    const routes = await request('routes');
+    element('route').innerHTML = routes.length ? routes.map(name => `<option>${escape(name)}</option>`).join('') : '<option value="">No saved GPX routes</option>';
+    const saved = passageSelection();
+    if (saved && routes.includes(saved.name)) {
+        element('route').value = saved.name;
+        element('departure').value = saved.time.slice(0, 16);
+        element('speed').value = saved.speed;
+    }
+} catch (error) { display('passage-status', error.message, true); }
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh compact weather forecasts every six hours
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=6h
+RandomizedDelaySec=10min
+Unit=seabird-weather-fetch.service
+
+[Install]
+WantedBy=timers.target

@@ -22,7 +22,7 @@ Environment=HOMEPAGE_ALLOWED_HOSTS=seabird.local,seabird.local:3002,100.64.0.1,1
 #   widgets.yaml    — top-bar widgets (weather, search, etc.)
 #   settings.yaml   — general settings
 #   docker.yaml     — (not used here — we use direct service URLs)
-Volume=/srv/seabird/homepage:/app/config:Z
+Volume=/srv/seabird/homepage:/app/config:z
 
 [Service]
 Restart=on-failure

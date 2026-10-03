@@ -1,10 +1,13 @@
 # Build artifacts
 artifacts/
+__pycache__/
+*.py[cod]
 
 # Secrets — never commit these
 /etc/seabird/
 *.env
 !*.env.example
+!config/avnav/weather.env
 
 # Editor
 *.code-workspace

@@ -1,0 +1,17 @@
+[Unit]
+Description=Download bounded GRIB weather forecasts without raster tiles
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/sbin/seabird-weather fetch
+EnvironmentFile=-/etc/seabird/weather.env
+TimeoutStartSec=45min
+Nice=10
+MemoryMax=768M
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/srv/seabird/weather
+ProtectHome=yes
+PrivateTmp=yes

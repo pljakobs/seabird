@@ -170,6 +170,12 @@
   handle /remotechannels/* {
     reverse_proxy 127.0.0.1:8088
   }
+  handle /chart/* {
+    reverse_proxy 127.0.0.1:8088
+  }
+  handle /wxapi/* {
+    reverse_proxy 127.0.0.1:8089
+  }
 
   # InfluxDB — strip prefix, SPA serves from root
   handle_path /influxdb* {

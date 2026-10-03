@@ -158,6 +158,16 @@ nmcli con modify "${NM_CONN}" \
     ipv6.method disabled \
     connection.autoconnect yes
 
+# Bind the AP profile to the physical card by permanent MAC so a boot-time wlan
+# name swap can never let an upstream client profile steal this radio.
+AP_PERM_MAC="$(ethtool -P "${AP_IFACE}" 2>/dev/null | awk '{print $NF}')"
+if ! [[ "${AP_PERM_MAC}" =~ ^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$ ]]; then
+    AP_PERM_MAC="$(cat "/sys/class/net/${AP_IFACE}/address" 2>/dev/null || true)"
+fi
+if [[ -n "${AP_PERM_MAC}" ]]; then
+    nmcli con modify "${NM_CONN}" 802-11-wireless.mac-address "${AP_PERM_MAC}"
+fi
+
 # ── DHCP range ────────────────────────────────────────────────────────────────
 # NM shared mode runs dnsmasq; custom range goes in dnsmasq-shared.d/
 

@@ -532,6 +532,14 @@ else
     fi
 fi
 
+# Pin any upstream WiFi client profiles to the onboard card so a boot-time wlan
+# name swap can't break upstream connectivity or steal the crew AP radio.
+if [[ -f "${SCRIPT_DIR}/install-upstream-wifi.sh" ]]; then
+    echo "  pinning upstream WiFi profiles to the onboard card..."
+    bash "${SCRIPT_DIR}/install-upstream-wifi.sh" || \
+        echo "  note: upstream WiFi pinning skipped (no onboard card detected yet)."
+fi
+
 # ── 5. Service quadlets ───────────────────────────────────────────────────────
 
 section "5/7  Services"
@@ -540,9 +548,19 @@ if [[ "${SKIP_SERVICES}" == true ]]; then
 else
     _hash_services=$(compute_module_hash \
         "${SCRIPT_DIR}/install-services.sh" \
+        "${SCRIPT_DIR}/seabird-weather.py" \
+        "${SCRIPT_DIR}/seabird-wifi-api.py" \
+        "${SCRIPT_DIR}/update-avnav-fnc-de.sh" \
+        "${SCRIPT_DIR}/../config/avnav"/* \
+        "${SCRIPT_DIR}/../config/systemd"/*.service \
+        "${SCRIPT_DIR}/../config/systemd"/*.timer \
+        "${SCRIPT_DIR}/../config/systemd"/*.target \
         "${SCRIPT_DIR}/../config/quadlets"/*.container \
         "${SCRIPT_DIR}/../config/quadlets"/*.pod \
         "${SCRIPT_DIR}/../config/homepage"/*.yaml \
+        "${SCRIPT_DIR}/../config/homepage"/*.js \
+        "${SCRIPT_DIR}/../config/homepage"/*.css \
+        "${SCRIPT_DIR}/../config/homepage/images"/* \
         "${SCRIPT_DIR}/../config/caddy/Caddyfile" \
         "${SCRIPT_DIR}/../config/tmpfiles.d"/*.conf)
     if should_run_step "services" "Services" "${_hash_services}"; then
@@ -648,12 +666,19 @@ else
     echo "  ! seabird-avnav-fnc-update.timer not found — skipping"
 fi
 
-# Enable periodic GRIB weather overlay updates for AvNav
-if systemctl cat seabird-avnav-grib-update.timer &>/dev/null; then
-    systemctl enable --now seabird-avnav-grib-update.timer
-    echo "  ✓ seabird-avnav-grib-update.timer"
+systemctl disable --now seabird-avnav-grib-update.timer seabird-avnav-grib-update.service 2>/dev/null || true
+for unit in seabird-weather-api.service seabird-wifi-api.service; do
+    if systemctl cat "${unit}" &>/dev/null; then
+        systemctl enable "${unit}"
+        systemctl restart "${unit}"
+        echo "  started ${unit}"
+    fi
+done
+if systemctl cat seabird-weather-fetch.timer &>/dev/null; then
+    systemctl enable --now seabird-weather-fetch.timer
+    echo "  started seabird-weather-fetch.timer"
 else
-    echo "  ! seabird-avnav-grib-update.timer not found — skipping"
+    echo "  seabird-weather-fetch.timer not found — skipping"
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────

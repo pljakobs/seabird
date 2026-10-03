@@ -1,0 +1,19 @@
+[Unit]
+Description=Seabird read-only weather forecast and passage API
+After=network.target avnav.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/sbin/seabird-weather serve
+EnvironmentFile=-/etc/seabird/weather.env
+Restart=on-failure
+RestartSec=10
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

@@ -9,6 +9,48 @@
         href: /signalk/admin/
         description: Marine data hub
         icon: signalk.png
+    - Wind:
+        icon: mdi-weather-windy
+        widget:
+          type: customapi
+          url: http://host.containers.internal:3000/signalk/v1/api/vessels/self/environment/wind
+          refreshInterval: 5000
+          mappings:
+            - field: speedApparent.value
+              label: Apparent Speed
+              format: float
+              scale: 1.9438444924
+              suffix: kn
+            - field: angleApparent.value
+              label: Apparent Angle
+              format: float
+              scale: 57.2957795131
+              suffix: deg
+            - field: speedApparent.timestamp
+              label: Updated
+              format: relativeDate
+    - Water:
+        id: seabird-water
+        icon: mdi-waves
+        widget:
+          type: customapi
+          url: http://host.containers.internal:3000/signalk/v1/api/vessels/self/environment
+          refreshInterval: 5000
+          mappings:
+            - field: depth.belowTransducer.value
+              label: Transducer Depth
+              format: float
+              suffix: m
+            - field: water.temperature.value
+              label: Temperature
+              format: text
+              suffix: K
+            - field: water.temperature.timestamp
+              label: Updated
+              format: relativeDate
+    - AIS Targets:
+        id: seabird-ais
+        icon: mdi-ferry
     - AvNav:
         href: /avnav
         description: Navigation & chart plotting

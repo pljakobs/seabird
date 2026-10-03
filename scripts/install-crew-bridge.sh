@@ -211,6 +211,20 @@ echo "  DHCP range     : ${DHCP_START} – ${DHCP_END}"
 echo "  DNS server     : ${PIHOLE_IP}"
 echo
 
+# Permanent MAC of an interface, so NM profiles bind to a physical card rather
+# than to a kernel name that can swap between boots (e.g. onboard wlan0/wlan1).
+perm_mac() {
+    local iface="$1" mac
+    mac="$(ethtool -P "${iface}" 2>/dev/null | awk '{print $NF}')"
+    if ! [[ "${mac}" =~ ^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$ ]] || [[ "${mac}" == "00:00:00:00:00:00" ]]; then
+        mac="$(cat "/sys/class/net/${iface}/address" 2>/dev/null || true)"
+    fi
+    echo "${mac}"
+}
+
+AP_PERM_MAC="$(perm_mac "${AP_IFACE}")"
+WIRED_PERM_MAC="$(perm_mac "${WIRED_IFACE}")"
+
 # -- step 1: create NM bridge profile and activate ---------------------------
 
 echo "Step 1: Creating NetworkManager bridge profile..."
@@ -268,6 +282,12 @@ nmcli con modify "${NM_AP_CONN}" \
     ipv6.method ignore \
     connection.autoconnect yes
 
+# Bind the AP profile to the physical Intel card by permanent MAC so a boot-time
+# wlan name swap can never let an upstream client profile steal this radio.
+if [[ -n "${AP_PERM_MAC}" ]]; then
+    nmcli con modify "${NM_AP_CONN}" 802-11-wireless.mac-address "${AP_PERM_MAC}"
+fi
+
 nmcli con up "${NM_AP_CONN}" 2>/dev/null || true
 sleep 1
 echo "  WiFi AP ready."
@@ -292,6 +312,10 @@ nmcli con modify "${NM_WIRED_CONN}" \
     ipv4.method disabled \
     ipv6.method ignore \
     connection.autoconnect yes
+
+if [[ -n "${WIRED_PERM_MAC}" ]]; then
+    nmcli con modify "${NM_WIRED_CONN}" 802-3-ethernet.mac-address "${WIRED_PERM_MAC}"
+fi
 
 nmcli con up "${NM_WIRED_CONN}" 2>/dev/null || true
 sleep 1
