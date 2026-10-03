@@ -190,6 +190,12 @@
     reverse_proxy 127.0.0.1:9090
   }
 
+  # Upstream WiFi management (host nmcli bridge: seabird-wifi-api on :8090).
+  # Serves the interactive scan/select/connect page and JSON endpoints.
+  handle /wifiapi* {
+    reverse_proxy 127.0.0.1:8090
+  }
+
     # Default: proxy to Homepage dashboard
     handle {
         reverse_proxy 127.0.0.1:3002

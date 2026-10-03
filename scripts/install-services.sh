@@ -214,7 +214,7 @@ fi
 # ── install homepage default config (if not already present) ─────────────────
 
 echo "Installing Homepage default config..."
-for f in services.yaml settings.yaml; do
+for f in services.yaml settings.yaml custom.js custom.css; do
     dest="/srv/seabird/homepage/${f}"
     if [[ ! -f "${dest}" ]]; then
         install -m 0644 "${CONFIG_SRC}/homepage/${f}" "${dest}"
@@ -378,6 +378,7 @@ for unit in \
     seabird-avnav-grib-update.service \
     seabird-avnav-grib-update.timer \
     seabird-weather-api.service \
+    seabird-wifi-api.service \
     seabird-services.target; do
     install -m 0644 "${SYSTEMD_SRC}/${unit}" "/etc/systemd/system/${unit}"
     echo "  /etc/systemd/system/${unit}"
@@ -390,6 +391,25 @@ install -m 0755 "${SCRIPT_DIR}/update-avnav-grib-overlay.sh" \
     /usr/local/sbin/seabird-update-avnav-grib-overlay
 install -m 0755 "${SCRIPT_DIR}/seabird-weather-api.py" \
     /usr/local/sbin/seabird-weather-api
+install -m 0755 "${SCRIPT_DIR}/seabird-wifi-api.py" \
+    /usr/local/sbin/seabird-wifi-api
+# Negative filter for the upstream WiFi picker: SSIDs listed here are hidden so
+# the crew's own AP is never offered as an upstream. Seed with the crew AP SSID.
+if [[ ! -f /etc/seabird/wifi-filter.conf ]]; then
+    mkdir -p /etc/seabird
+    _CREW_SSID="$(nmcli -g 802-11-wireless.ssid con show seabird-ap 2>/dev/null | tr -d '\n' || true)"
+    {
+        echo "# One SSID per line; these are hidden from the upstream WiFi picker."
+        echo "# '#' starts a comment. Edit then: systemctl restart seabird-wifi-api"
+        if [[ -n "${_CREW_SSID}" ]]; then
+            echo "${_CREW_SSID}"
+        fi
+    } > /etc/seabird/wifi-filter.conf
+    chmod 0644 /etc/seabird/wifi-filter.conf
+    echo "  /etc/seabird/wifi-filter.conf created${_CREW_SSID:+ (hiding '${_CREW_SSID}')}"
+else
+    echo "  /etc/seabird/wifi-filter.conf already exists — skipping"
+fi
 mkdir -p /srv/seabird/avnav/charts/fnc
 mkdir -p /srv/seabird/avnav/user/viewer
 install -m 0644 "${CONFIG_SRC}/avnav/user.js" \
@@ -629,6 +649,11 @@ if ! systemctl is-enabled seabird-weather-api.service &>/dev/null; then
 fi
 
 echo ""
+if ! systemctl is-enabled seabird-wifi-api.service &>/dev/null; then
+    systemctl enable seabird-wifi-api.service
+    echo "  enabled seabird-wifi-api.service"
+fi
+
 echo "Services installed."
 echo "Start/stop/restart all services:"
 echo "  systemctl start   seabird-services.target"
@@ -636,7 +661,7 @@ echo "  systemctl stop    seabird-services.target"
 echo "  systemctl restart seabird-services.target"
 echo ""
 echo "Or individually:"
-echo "  systemctl start caddy influxdb signalk grafana nextcloud-pod homepage pihole navidrome avnav seabird-weather-api"
+echo "  systemctl start caddy influxdb signalk grafana nextcloud-pod homepage pihole navidrome avnav seabird-weather-api seabird-wifi-api"
 echo ""
 echo "Add crew users with:"
 echo "  scripts/add-user.sh <username>"

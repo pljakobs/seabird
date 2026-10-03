@@ -1,0 +1,17 @@
+[Unit]
+Description=Seabird upstream WiFi management API (nmcli bridge)
+Documentation=https://github.com/pljakobs/seabird
+PartOf=seabird-services.target
+After=network-online.target NetworkManager.service
+Wants=network-online.target
+Requires=NetworkManager.service
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/seabird/wifi-api.env
+ExecStart=/usr/local/sbin/seabird-wifi-api
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=seabird-services.target default.target

@@ -35,8 +35,9 @@
         icon: grafana.png
         widget:
           type: grafana
-          # Widget URL is fetched server-side from inside the container
-          url: http://127.0.0.1:3001
+          # Fetched server-side from inside the container (bridge network), so it
+          # must reach the host via host.containers.internal, not 127.0.0.1.
+          url: http://host.containers.internal:3001
 
 - Entertainment:
     - Navidrome:
@@ -73,3 +74,26 @@
         href: /cockpit
         description: System admin
         icon: cockpit.png
+    - Upstream WiFi:
+        # Interactive scan/select/connect page served by seabird-wifi-api on the
+        # host (nmcli bridge). The customapi widget below is read-only status.
+        href: /wifiapi/
+        description: Marina / harbour WiFi
+        icon: mdi-wifi
+        widget:
+          type: customapi
+          # Homepage fetches this server-side from inside its container (bridge
+          # network), so it must reach the host via host.containers.internal and
+          # go through Caddy — the API itself binds host loopback only.
+          url: http://host.containers.internal/wifiapi/widget
+          refreshInterval: 10000
+          mappings:
+            # Status colour is carried as a leading emoji in each value, since
+            # customapi cannot colour fields or show tooltips. Click the tile to
+            # open the scan/connect page.
+            - field: crew
+              label: Crew WLAN
+            - field: upstream
+              label: Upstream WiFi
+            - field: cellular
+              label: Cellular
