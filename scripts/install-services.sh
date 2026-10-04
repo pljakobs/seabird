@@ -211,29 +211,35 @@ else
     echo "  Re-run install-services.sh after AvNav's first start to apply SignalK GPS config."
 fi
 
-# ── install homepage default config (if not already present) ─────────────────
+# ── deploy repo-managed homepage config and assets ──────────────────────────
 
-echo "Installing Homepage default config..."
+echo "Deploying Homepage config..."
 for f in services.yaml settings.yaml custom.js custom.css; do
+    source="${CONFIG_SRC}/homepage/${f}"
     dest="/srv/seabird/homepage/${f}"
-    if [[ ! -f "${dest}" ]]; then
-        install -m 0644 "${CONFIG_SRC}/homepage/${f}" "${dest}"
+    if ! cmp -s "${source}" "${dest}"; then
+        if [[ -f "${dest}" ]]; then
+            cp -p "${dest}" "$(mktemp "${dest}.bak.XXXXXX")"
+        fi
+        install -m 0644 "${source}" "${dest}"
         echo "  installed ${f}"
     else
-        echo "  ${f} already exists — skipping"
+        echo "  ${f} unchanged — skipping"
     fi
 done
 
-# ── create env file stubs (if not present) ───────────────────────────────────
 mkdir -p /srv/seabird/homepage/images
-for asset in geographiclib-geodesic.min.js geographiclib-LICENSE.txt; do
-    source="${CONFIG_SRC}/homepage/images/${asset}"
+for source in "${CONFIG_SRC}/homepage/images/"*; do
+    [[ -f "${source}" ]] || continue
+    asset="$(basename "${source}")"
     dest="/srv/seabird/homepage/images/${asset}"
     if ! cmp -s "${source}" "${dest}"; then
         install -m 0644 "${source}" "${dest}"
     fi
 done
 chcon -Rt container_file_t /srv/seabird/homepage/images 2>/dev/null || true
+
+# ── create env file stubs (if not present) ───────────────────────────────────
 
 echo "Creating /etc/seabird env stubs..."
 mkdir -p /etc/seabird

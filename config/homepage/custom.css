@@ -66,3 +66,149 @@
 #seabird-ais .seabird-ais-header {
   font-weight: 600;
 }
+
+#seabird-battery .seabird-battery-panel {
+  padding: 12px 16px;
+}
+#seabird-battery .seabird-battery-instruments {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: 16px;
+  align-items: center;
+}
+#seabird-battery .seabird-soc,
+#seabird-battery .seabird-current {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  font-size: 0.75rem;
+}
+#seabird-battery .seabird-battery-body {
+  position: relative;
+  width: min(90%, 110px);
+  height: 48px;
+  border: 3px solid currentColor;
+  border-radius: 4px;
+  padding: 3px;
+}
+#seabird-battery .seabird-battery-body::after {
+  content: "";
+  position: absolute;
+  right: -9px;
+  top: 12px;
+  width: 6px;
+  height: 18px;
+  background: currentColor;
+  border-radius: 0 2px 2px 0;
+}
+#seabird-battery .seabird-battery-fill {
+  width: 0;
+  height: 100%;
+  border-radius: 1px;
+  transition: width 0.4s ease;
+}
+#seabird-battery .seabird-soc-value,
+#seabird-battery .seabird-current-value {
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+  min-height: 1.75rem;
+}
+#seabird-battery .seabird-soc-value {
+  margin-top: 8px;
+}
+#seabird-battery svg {
+  width: 100%;
+  max-width: 240px;
+  aspect-ratio: 240 / 135;
+  overflow: visible;
+}
+#seabird-battery .seabird-discharge-arc,
+#seabird-battery .seabird-charge-arc {
+  fill: none;
+  stroke-width: 10;
+}
+#seabird-battery .seabird-discharge-arc {
+  stroke: #eab308;
+}
+#seabird-battery .seabird-charge-arc {
+  stroke: #22c55e;
+}
+#seabird-battery .seabird-gauge-ticks {
+  stroke: currentColor;
+  stroke-width: 2;
+}
+#seabird-battery svg text {
+  fill: currentColor;
+  font-size: 13px;
+}
+#seabird-battery .seabird-current-needle {
+  fill: currentColor;
+  transform-origin: 120px 110px;
+  transition: transform 0.4s ease;
+}
+#seabird-battery .seabird-current-labels,
+#seabird-battery .seabird-battery-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+#seabird-battery .seabird-battery-summary {
+  margin-top: 12px;
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+}
+#seabird-battery .seabird-reading-stale {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+#seabird-wind .seabird-wind-panel {
+  padding: 12px 16px;
+  text-align: center;
+}
+#seabird-wind .seabird-wind-dial {
+  position: relative;
+  width: min(100%, 280px);
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+#seabird-wind canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+#seabird-wind .seabird-wind-readout {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 36%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #181c20;
+  color: #f8fafc;
+  pointer-events: none;
+}
+#seabird-wind .seabird-wind-readout strong {
+  font-size: 1.75rem;
+  font-variant-numeric: tabular-nums;
+}
+#seabird-wind .seabird-wind-readout span,
+#seabird-wind .seabird-wind-status {
+  font-size: 0.75rem;
+}
+#seabird-wind .seabird-wind-angle {
+  font-size: 0.9rem;
+  margin-top: 8px;
+}
+#seabird-wind .seabird-wind-status {
+  min-height: 1.2rem;
+}
+#seabird-wind .seabird-wind-stale .seabird-wind-dial {
+  filter: grayscale(1);
+  opacity: 0.55;
+}

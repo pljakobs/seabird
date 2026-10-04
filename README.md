@@ -203,3 +203,8 @@ Each install script is idempotent and can be re-run to update a single component
 | `install-services.sh` | Quadlet deployment and initial service configs |
 | `install-headscale.sh` | Tailscale install and Headscale join (`--join`, `--login-server`, `--auth-key`, `--hostname`) |
 
+Homepage's `services.yaml`, `settings.yaml`, `custom.js`, and `custom.css` are
+repo-managed: `install-services.sh` deploys changed files on every run, saving
+the previous config as unique `.bak.*` files. Make persistent customizations in
+`config/homepage/`, not only on the device. Bundled images and library assets are
+also deployed; unchanged files and unrelated host files are left alone.

@@ -5,30 +5,13 @@
 # hostname (LAN, tailscale IP, tailscale DNS name).
 
 - Marine:
+    - Wind:
+        id: seabird-wind
+        icon: mdi-weather-windy
     - Signal-K:
         href: /signalk/admin/
         description: Marine data hub
         icon: signalk.png
-    - Wind:
-        icon: mdi-weather-windy
-        widget:
-          type: customapi
-          url: http://host.containers.internal:3000/signalk/v1/api/vessels/self/environment/wind
-          refreshInterval: 5000
-          mappings:
-            - field: speedApparent.value
-              label: Apparent Speed
-              format: float
-              scale: 1.9438444924
-              suffix: kn
-            - field: angleApparent.value
-              label: Apparent Angle
-              format: float
-              scale: 57.2957795131
-              suffix: deg
-            - field: speedApparent.timestamp
-              label: Updated
-              format: relativeDate
     - Water:
         id: seabird-water
         icon: mdi-waves
@@ -51,6 +34,9 @@
     - AIS Targets:
         id: seabird-ais
         icon: mdi-ferry
+    - Hausbatterie:
+        id: seabird-battery
+        icon: mdi-battery
     - AvNav:
         href: /avnav
         description: Navigation & chart plotting
