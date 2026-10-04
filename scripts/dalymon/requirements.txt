@@ -1,0 +1,5 @@
+aiobmsble==0.22.0
+bleak==3.0.2
+bleak-retry-connector==4.6.0
+influxdb-client==1.50.0
+websockets==17.2

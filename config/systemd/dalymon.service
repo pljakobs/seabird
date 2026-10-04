@@ -1,0 +1,15 @@
+[Unit]
+Description=Daly BMS BLE monitoring daemon
+After=network.target bluetooth.target
+Wants=network.target bluetooth.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/root/.local/lib/dalymon/.venv/bin/python /root/.local/lib/dalymon/dalymon.py --config /etc/dalymon.conf
+Restart=on-failure
+RestartSec=30
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

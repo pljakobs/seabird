@@ -9,6 +9,12 @@ __pycache__/
 !*.env.example
 !config/avnav/weather.env
 
+# Daly BMS runtime data and credentials
+/config/dalymon/dalymon.conf
+/scripts/dalymon/battery_data.jsonl
+/scripts/dalymon/signalk_token.txt
+/scripts/dalymon/dalymon_token.txt
+
 # Editor
 *.code-workspace
 .vscode/

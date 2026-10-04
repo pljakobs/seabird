@@ -1,0 +1,36 @@
+# Daly BMS Monitor configuration (example)
+
+[logging]
+level = "INFO"
+interval = 300  # seconds between successful polls
+
+[jsonl]
+enabled = true
+file_path = "/root/.local/lib/dalymon/battery_data.jsonl"
+
+[influxdb]
+enabled = true
+url = "http://localhost:8086"
+token = "REPLACE_WITH_INFLUX_TOKEN"
+org = "seabird"
+bucket = "Battery"
+
+[[batteries]]
+name = "Hausbatterie"
+address = "40:17:08:01:1B:B2"
+
+# Add more batteries by repeating the [[batteries]] block:
+# [[batteries]]
+# name = "Starterbatterie"
+# address = "AA:BB:CC:DD:EE:FF"
+
+[signalk]
+enabled = true
+http_url = "http://localhost:3000"
+token_file = "/root/.local/lib/dalymon/signalk_token.txt"
+source_label = "dalymon"
+# aiobmsble reports +current = charging; set true to invert to Signal K schema.
+invert_current = false
+# Optional stable ids for electrical.batteries.<id>
+# [signalk.battery_ids]
+# HouseBattery = "house"

@@ -203,6 +203,14 @@ Each install script is idempotent and can be re-run to update a single component
 | `install-services.sh` | Quadlet deployment and initial service configs |
 | `install-headscale.sh` | Tailscale install and Headscale join (`--join`, `--login-server`, `--auth-key`, `--hostname`) |
 
+The Daly BMS monitor is optional and is not installed by `install-all.sh` or
+`install-services.sh`. Install it separately with `sudo scripts/install-dalymon.sh`.
+On first run this installs its pinned Python environment, code, unit, and
+`/etc/dalymon.conf.example` without starting the service. Copy the example to
+`/etc/dalymon.conf`, set the InfluxDB token (or disable InfluxDB), then rerun the
+installer to enable and start dalymon. The installer protects the real config
+with mode `0600`; runtime logs and Signal K tokens stay outside the repository.
+
 Homepage's `services.yaml`, `settings.yaml`, `custom.js`, and `custom.css` are
 repo-managed: `install-services.sh` deploys changed files on every run, saving
 the previous config as unique `.bak.*` files. Make persistent customizations in
