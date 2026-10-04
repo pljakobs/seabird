@@ -216,3 +216,4 @@ repo-managed: `install-services.sh` deploys changed files on every run, saving
 the previous config as unique `.bak.*` files. Make persistent customizations in
 `config/homepage/`, not only on the device. Bundled images and library assets are
 also deployed; unchanged files and unrelated host files are left alone.
+
