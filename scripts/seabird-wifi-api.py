@@ -236,7 +236,7 @@ def cellular_status():
     if idx is None:
         return {"present": False, "state": "absent", "signal": None, "access": ""}
 
-    state, signal, access = "unknown", None, ""
+    state, signal, access, provider = "unknown", None, "", ""
     try:
         out = run(["mmcli", "-m", idx, "-K"], timeout=10)
         d = {}
@@ -248,10 +248,18 @@ def cellular_status():
         sq = d.get("modem.generic.signal-quality.value", "")
         if sq.isdigit():
             signal = int(sq)
-        access = d.get("modem.generic.access-technologies.value[1]", "") or ""
+        technologies = [value for key, value in d.items()
+                        if key.startswith("modem.generic.access-technologies.value[")
+                        and value != "--"]
+        access = "/".join("5G" if value == "5gnr" else value.upper()
+                          for value in technologies)
+        provider = d.get("modem.3gpp.operator-name", "")
+        if provider == "--":
+            provider = ""
     except Exception:
         pass
-    return {"present": True, "state": state, "signal": signal, "access": access}
+    return {"present": True, "state": state, "signal": signal, "access": access,
+            "provider": provider}
 
 
 def widget_payload():
@@ -286,7 +294,9 @@ def widget_payload():
     if cell["present"] and cell["state"] in ("registered", "connected"):
         acc = (cell["access"] or "cell").upper()
         sig = cell["signal"]
-        cell_s = f"🟢 {acc}" + (f" {sig}%" if sig else "")
+        provider = cell.get("provider", "")
+        connection = f"{provider} / {acc}" if provider else acc
+        cell_s = f"🟢 {connection}" + (f" {sig}%" if sig is not None else "")
     elif cell["present"]:
         cell_s = "🔴 no signal"
     else:

@@ -10,6 +10,52 @@
   var windLibrary;
   var windInstrument;
 
+  function networkSignalLevel(percentage) {
+    if (!Number.isFinite(percentage) || percentage <= 0) return 0;
+    return Math.min(4, Math.ceil(percentage / 25));
+  }
+
+  function renderNetworkSignals() {
+    var tile = document.getElementById("seabird-network");
+    if (!tile) return;
+    tile.querySelectorAll(".seabird-signal-bars").forEach(function (indicator) {
+      if (!indicator.parentElement.classList.contains("service-block")) indicator.remove();
+    });
+    tile.querySelectorAll(".service-block").forEach(function (block) {
+      var value = block.firstElementChild;
+      var label = block.lastElementChild.textContent.trim().toLowerCase();
+      var status = value.textContent;
+      var cellular = label === "cellular";
+      var wifi = label === "upstream wifi";
+      var indicator = block.querySelector(".seabird-signal-bars");
+      if ((!cellular && !wifi) || (wifi && !status.includes("\ud83d\udfe2"))) {
+        if (indicator) indicator.remove();
+        return;
+      }
+      var match = status.match(/(?:^|\s)(\d{1,3})%$/);
+      var percentage = match && Number(match[1]) <= 100 ? Number(match[1]) : null;
+      var level = networkSignalLevel(percentage);
+      if (!indicator) {
+        indicator = document.createElement("span");
+        indicator.className = "seabird-signal-bars";
+        indicator.setAttribute("role", "img");
+        for (var bar = 1; bar <= 4; bar++) {
+          var segment = document.createElement("i");
+          segment.style.height = (bar * 4) + "px";
+          indicator.appendChild(segment);
+        }
+        value.after(indicator);
+      }
+      var description = percentage === null ? "Signal strength unavailable" : "Signal strength: " + percentage + "%";
+      indicator.setAttribute("aria-label", description);
+      indicator.title = description;
+      indicator.dataset.level = String(level);
+      Array.from(indicator.children).forEach(function (segment, index) {
+        segment.classList.toggle("active", index < level);
+      });
+    });
+  }
+
   function windGaugeState(data, now) {
     var speed = data.speedApparent;
     var angle = data.angleApparent;
@@ -160,6 +206,65 @@
         gauge.classList.add("seabird-reading-stale");
       });
       panel.querySelector(".seabird-battery-state").textContent = error.message;
+    }
+  }
+
+  function solarGaugeState(data, now) {
+    var names = ["panelPower", "panelVoltage", "panelCurrent", "voltage", "current", "power",
+      "yieldToday", "chargingMode", "faults", "problem"];
+    var result = {};
+    names.forEach(function (name) {
+      var field = data[name];
+      var time = Date.parse(field && field.timestamp);
+      var value = field && field.value;
+      var valid = name === "chargingMode" || name === "faults" ? typeof value === "string" :
+        name === "problem" ? typeof value === "boolean" : Number.isFinite(value) && value >= 0;
+      result[name] = { value: valid ? value : null,
+        stale: !valid || !Number.isFinite(time) || now - time > 120000 };
+    });
+    return result;
+  }
+
+  async function refreshSolar() {
+    var tile = document.getElementById("seabird-solar");
+    if (!tile) return;
+    var panel = tile.querySelector(".seabird-solar-panel");
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.className = "seabird-solar-panel";
+      panel.setAttribute("aria-label", "Epever solar controller");
+      panel.innerHTML = '<strong class="seabird-solar-power">-- W</strong>' +
+        '<div>Solar input</div><div class="seabird-solar-pv">-- V / -- A</div>' +
+        '<div class="seabird-solar-charge">Charge: --</div><div class="seabird-solar-yield">Today: --</div>' +
+        '<div class="seabird-solar-status" role="status">Loading</div>';
+      tile.appendChild(panel);
+    }
+    try {
+      var response = await fetch("/signalk/v1/api/vessels/self/electrical/solar/epever", {
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!response.ok) throw new Error("Solar data unavailable");
+      var state = solarGaugeState(await response.json(), Date.now());
+      function display(name, precision, suffix, divisor) {
+        var reading = state[name];
+        return reading.value === null ? "--" + suffix :
+          (reading.value / (divisor || 1)).toFixed(precision) + suffix + (reading.stale ? " (stale)" : "");
+      }
+      var stale = Object.keys(state).some(function (name) { return state[name].stale; });
+      panel.classList.toggle("seabird-solar-stale", stale);
+      panel.classList.toggle("seabird-solar-fault", !state.problem.stale && state.problem.value === true);
+      panel.querySelector(".seabird-solar-power").textContent = display("panelPower", 1, " W");
+      panel.querySelector(".seabird-solar-pv").textContent = display("panelVoltage", 2, " V") + " / " + display("panelCurrent", 2, " A");
+      panel.querySelector(".seabird-solar-charge").textContent = "Charge: " + display("current", 2, " A") +
+        " / " + display("power", 1, " W") + " / " + display("voltage", 2, " V");
+      panel.querySelector(".seabird-solar-yield").textContent = "Today: " + display("yieldToday", 2, " kWh", 3600000);
+      panel.querySelector(".seabird-solar-status").textContent =
+        (stale ? "Stale / incomplete data" : state.chargingMode.value === "unknown" ? "Not charging" : state.chargingMode.value) +
+        (state.problem.value === true ? " / " + (state.faults.value || "Controller fault") : "");
+    } catch (error) {
+      panel.classList.add("seabird-solar-stale");
+      panel.classList.remove("seabird-solar-fault");
+      panel.querySelector(".seabird-solar-status").textContent = error.message;
     }
   }
 
@@ -371,12 +476,17 @@
   );
 
   formatWaterTemperature();
+  renderNetworkSignals();
   var waterObserver = new MutationObserver(formatWaterTemperature);
   waterObserver.observe(document.body, { childList: true, characterData: true, subtree: true });
+  var networkObserver = new MutationObserver(renderNetworkSignals);
+  networkObserver.observe(document.body, { childList: true, characterData: true, subtree: true });
   refreshAisTargets();
   setInterval(refreshAisTargets, 10000);
   refreshBattery();
   setInterval(refreshBattery, 10000);
+  refreshSolar();
+  setInterval(refreshSolar, 10000);
   refreshWind();
   setInterval(refreshWind, 5000);
 })();

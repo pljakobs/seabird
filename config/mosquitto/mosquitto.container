@@ -1,0 +1,24 @@
+[Unit]
+Description=Seabird crew-network MQTT broker
+Documentation=https://mosquitto.org/documentation/
+After=network-online.target
+Wants=network-online.target
+RequiresMountsFor=/srv/seabird/mosquitto
+
+[Container]
+Image=docker.io/eclipse-mosquitto:2
+ContainerName=mosquitto
+AutoUpdate=registry
+Pull=missing
+
+# Host networking preserves the listener's explicit crew-only address binding.
+Network=host
+Volume=/srv/seabird/mosquitto/config:/mosquitto/config:ro,Z
+Volume=/srv/seabird/mosquitto/data:/mosquitto/data:Z
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

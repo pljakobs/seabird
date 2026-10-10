@@ -81,6 +81,7 @@ class SignalKSink:
         self.token_file = str(conf.get("token_file", "signalk_token.txt"))
         self.state_file = str(conf.get("state_file", self.token_file + ".request.json"))
         self.source_label = str(conf.get("source_label", "dalymon"))
+        self.description = str(conf.get("description", "Daly BMS monitor (dalymon)"))
         self.battery_ids = dict(conf.get("battery_ids", {}))
         self.invert_current = bool(conf.get("invert_current", False))
         self.log = log
@@ -154,7 +155,7 @@ class SignalKSink:
             _, body = self._http_json(
                 "POST",
                 self.http_url + "/signalk/v1/access/requests",
-                {"clientId": self.client_id, "description": "Daly BMS monitor (dalymon)"},
+                {"clientId": self.client_id, "description": self.description},
             )
         except (urllib.error.URLError, OSError, ValueError) as e:
             self.log(f"[signalk] Failed to create access request: {e}")
@@ -173,19 +174,24 @@ class SignalKSink:
         return False
 
     # ---- delta send -----------------------------------------------------
-    async def send(self, name: str, data: dict) -> None:
+    def values_for(self, name: str, data: dict) -> list[dict]:
+        bid = _battery_id(name, self.battery_ids)
+        return _sk_values(bid, data, self.invert_current)
+
+    async def ensure_access(self) -> bool:
         if not self.enabled:
-            return
+            return False
         if websockets is None:
             if not self._warned_no_ws:
                 self.log("[signalk] 'websockets' package not installed; Signal K export disabled")
                 self._warned_no_ws = True
-            return
-        if not self.token and not await asyncio.to_thread(self._ensure_token_sync):
-            return
+            return False
+        return bool(self.token) or await asyncio.to_thread(self._ensure_token_sync)
 
-        bid = _battery_id(name, self.battery_ids)
-        values = _sk_values(bid, data, self.invert_current)
+    async def send(self, name: str, data: dict) -> None:
+        if not await self.ensure_access():
+            return
+        values = self.values_for(name, data)
         if not values:
             return
 
@@ -206,6 +212,6 @@ class SignalKSink:
                 close_timeout=5,
             ) as ws:
                 await ws.send(json.dumps(delta))
-            self.log(f"[{name}] Sent {len(values)} values to Signal K as '{bid}'")
+            self.log(f"[{name}] Sent {len(values)} values to Signal K")
         except Exception as e:  # noqa: BLE001 - network send is best-effort
             self.log(f"[{name}] Signal K send failed: {e}")

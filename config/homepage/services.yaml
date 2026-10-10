@@ -37,6 +37,9 @@
     - Hausbatterie:
         id: seabird-battery
         icon: mdi-battery
+    - Solar:
+        id: seabird-solar
+        icon: mdi-solar-power
     - AvNav:
         href: /avnav
         description: Navigation & chart plotting
@@ -103,6 +106,7 @@
         description: System admin
         icon: cockpit.png
     - Upstream WiFi:
+        id: seabird-network
         # Interactive scan/select/connect page served by seabird-wifi-api on the
         # host (nmcli bridge). The customapi widget below is read-only status.
         href: /wifiapi/

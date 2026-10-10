@@ -1,0 +1,17 @@
+[Unit]
+Description=Epever MPPT read-only TCP monitoring daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/.local/lib/epevermon
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/root/.local/lib/epevermon/.venv/bin/python /root/.local/lib/epevermon/epevermon.py --config /etc/epevermon.conf
+Restart=on-failure
+RestartSec=30
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

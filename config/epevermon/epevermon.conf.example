@@ -1,0 +1,30 @@
+# Epever MPPT monitoring, read-only Modbus RTU through a transparent TCP gateway.
+# Requires Python 3.11+. No charge settings or load switching are written.
+
+[[controllers]]
+name = "Epever MPPT"
+id = "epever"
+host = "192.168.42.217"
+port = 9999
+slave = 1
+transport = "rtu" # Use "tcp" only if the gateway explicitly uses Modbus TCP/MBAP.
+timeout = 5
+interval = 30
+
+[jsonl]
+enabled = true
+file_path = "/root/.local/lib/epevermon/solar_data.jsonl"
+
+[influxdb]
+enabled = false
+url = "http://localhost:8086"
+token = "REPLACE_WITH_INFLUX_TOKEN"
+org = "seabird"
+bucket = "Solar" # Create the bucket and grant this token write access first.
+
+[signalk]
+enabled = true
+http_url = "http://localhost:3000"
+token_file = "/root/.local/lib/epevermon/signalk_token.txt"
+source_label = "epevermon"
+description = "Epever solar monitor (epevermon)"
