@@ -185,9 +185,15 @@ sudo scripts/install-all.sh [options]
 /etc/seabird/nextcloud.env
 /etc/seabird/influxdb.env
 /etc/seabird/grafana.env
+/etc/seabird/homepage.env
 ```
 
 See `/etc/seabird/*.env.example` on the device for required variables.
+
+Set `HOMEPAGE_VAR_GRAFANA_TOKEN` in `homepage.env` to a Grafana service-account
+token with Viewer access. Homepage sends it to Grafana as a Bearer token; do not
+configure the token as the Grafana widget password, which uses HTTP Basic
+authentication instead.
 
 ### Individual component scripts
 
@@ -216,4 +222,3 @@ repo-managed: `install-services.sh` deploys changed files on every run, saving
 the previous config as unique `.bak.*` files. Make persistent customizations in
 `config/homepage/`, not only on the device. Bundled images and library assets are
 also deployed; unchanged files and unrelated host files are left alone.
-

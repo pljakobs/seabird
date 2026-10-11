@@ -291,7 +291,7 @@ fi
 
 # ── remaining env stubs (touch-only if missing) ───────────────────────────────
 
-for f in grafana.env; do
+for f in grafana.env homepage.env; do
     dest="/etc/seabird/${f}"
     if [[ ! -f "${dest}" ]]; then
         touch "${dest}"
