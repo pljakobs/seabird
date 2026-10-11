@@ -196,7 +196,7 @@
   }
 
   function drawLineChart(canvas, points, options) {
-    if (!canvas || !points || points.length < 2) return;
+    if (!canvas) return;
     var context = canvas.getContext("2d");
     var ratio = window.devicePixelRatio || 1;
     var width = canvas.clientWidth;
@@ -206,8 +206,23 @@
     canvas.height = Math.round(height * ratio);
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, width, height);
+    context.font = "9px sans-serif";
 
-    var range = chartRange(points.map(function (point) { return point.value; }), options);
+    // An empty trace is labelled rather than left as a blank box, so a sensor
+    // that is not publishing is distinguishable from a chart that failed.
+    var now = Date.now();
+    var start = now - (options.windowMs || HISTORY_MS);
+    var visible = (points || []).filter(function (point) { return point.time >= start; });
+    if (visible.length < 2) {
+      context.fillStyle = "rgba(148, 163, 184, 0.75)";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText((options.label ? options.label + " \u2014 " : "") +
+        (visible.length ? "collecting\u2026" : "no data"), width / 2, height / 2);
+      return;
+    }
+
+    var range = chartRange(visible.map(function (point) { return point.value; }), options);
     var min = range.min;
     var span = range.max - range.min || 1;
     var padLeft = 34;
@@ -216,9 +231,6 @@
     var padBottom = 12;
     var plotWidth = width - padLeft - padRight;
     var plotHeight = height - padTop - padBottom;
-    // Fixed 10-minute window so the trace scrolls left rather than rescaling.
-    var now = Date.now();
-    var start = now - (options.windowMs || 600000);
 
     function plotX(time) {
       return padLeft + Math.max(0, Math.min(1, (time - start) / (now - start))) * plotWidth;
@@ -242,9 +254,6 @@
       context.stroke();
       context.fillText(value.toFixed(options.precision || 0) + (options.unit || ""), padLeft - 4, y);
     }
-
-    var visible = points.filter(function (point) { return point.time >= start; });
-    if (visible.length < 2) return;
 
     context.beginPath();
     visible.forEach(function (point, index) {
@@ -344,7 +353,13 @@
     context.fillText("\u221210 min", width / 2, height - padBottom / 2);
 
     var visible = points.filter(function (point) { return point.time >= start; });
-    if (visible.length < 2) return;
+    if (visible.length < 2) {
+      context.fillStyle = "rgba(148, 163, 184, 0.75)";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText(visible.length ? "collecting\u2026" : "no wind data", width / 2, height / 2);
+      return;
+    }
 
     // Break the trace where the wind crosses dead astern so it does not draw a
     // false horizontal sweep across the whole plot.
