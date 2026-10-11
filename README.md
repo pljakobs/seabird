@@ -260,6 +260,25 @@ Tests:
 `/root/.local/lib/epevermon/.venv/bin/python -m unittest discover -s scripts -p 'test_epevermon.py'`
 and `node --test scripts/test_homepage_solar.js`.
 
+### Dashboard trend graphs
+
+The Water, Hausbatterie and Wind tiles each render a rolling **10-minute**
+trend below their instruments, drawn on a canvas by `config/homepage/custom.js`:
+
+| Tile | Graph |
+|---|---|
+| Water | Depth below transducer (m) and water temperature (°C) as separate traces |
+| Hausbatterie | State of charge (%) and charge/discharge current (A, zero always in range) |
+| Wind | Apparent wind angle vs time — port left of centre, starboard right, both 0–180°, newest sample at the top scrolling down to −10 min |
+
+History is held **in the browser tab only**; it is not persisted and starts
+empty on every page load, so a freshly opened dashboard fills in over 10
+minutes. This deliberately avoids a new InfluxDB query path — for long-range
+history use Grafana. Samples that Signal K reports as stale are not appended,
+so a dead sensor freezes the trace rather than drawing a false flat line.
+
+Tests: `node --test scripts/test_homepage_charts.js`.
+
 Homepage's `services.yaml`, `settings.yaml`, `custom.js`, and `custom.css` are
 repo-managed: `install-services.sh` deploys changed files on every run, saving
 the previous config as unique `.bak.*` files. Make persistent customizations in

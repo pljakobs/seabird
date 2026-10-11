@@ -7,6 +7,8 @@
   var WIFI_PATH = "/wifiapi/";
   var aisLibrary;
   var BATTERY_CURRENT_LIMIT = 50;
+  var HISTORY_MS = 600000;
+  var WIND_HISTORY_MS = 600000;
   var windLibrary;
   var windInstrument;
 
@@ -119,6 +121,11 @@
           animation: false, fontNumbersSize: 17 }).draw();
       }
       var state = windGaugeState(results[1], Date.now());
+      if (state.signedAngle !== null && !state.stale) {
+        appendHistory(rollingHistory.wind, { time: Date.now(), value: state.signedAngle }, WIND_HISTORY_MS);
+      }
+      var windHistory = ensureChartCanvas(panel, "seabird-wind-history");
+      drawWindAngleHistory(windHistory, rollingHistory.wind);
       panel.classList.toggle("seabird-wind-stale", state.stale || state.angle === null);
       canvas.style.visibility = state.angle === null ? "hidden" : "visible";
       if (state.angle !== null) windInstrument.update({ value: state.angle });
@@ -134,6 +141,243 @@
       panel.classList.add("seabird-wind-stale");
       panel.querySelector(".seabird-wind-status").textContent = error.message;
     }
+  }
+
+  var rollingHistory = {
+    waterDepth: [],
+    waterTemperature: [],
+    batterySoc: [],
+    batteryCurrent: [],
+    wind: []
+  };
+
+  function appendHistory(list, sample, maxAgeMs) {
+    if (!sample || !Number.isFinite(sample.value)) return list;
+    var timestamp = Number.isFinite(sample.time) ? sample.time : Date.now();
+    list.push({ time: timestamp, value: sample.value });
+    var cutoff = Date.now() - maxAgeMs;
+    while (list.length > 1 && list[0].time < cutoff) {
+      list.shift();
+    }
+    return list;
+  }
+
+  function ensureChartCanvas(container, className) {
+    var canvas = container.querySelector("canvas." + className);
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      canvas.className = className;
+      container.appendChild(canvas);
+    }
+    return canvas;
+  }
+
+  // Auto-ranges to the data, but never collapses below `minSpan` so a flat
+  // trace stays a flat line instead of exploding into noise. Clamps are applied
+  // after padding so a padded axis cannot run past a physical limit (such as
+  // negative depth).
+  function chartRange(values, options) {
+    var min = Math.min.apply(Math, values);
+    var max = Math.max.apply(Math, values);
+    if (Number.isFinite(options.floor)) min = Math.min(min, options.floor);
+    if (Number.isFinite(options.ceiling)) max = Math.max(max, options.ceiling);
+    var span = Number.isFinite(options.minSpan) ? options.minSpan : 1;
+    if (max - min < span) {
+      var middle = (max + min) / 2;
+      min = middle - span / 2;
+      max = middle + span / 2;
+    }
+    var pad = (max - min) * 0.08;
+    min -= pad;
+    max += pad;
+    if (Number.isFinite(options.clampMin)) min = Math.max(min, options.clampMin);
+    if (Number.isFinite(options.clampMax)) max = Math.min(max, options.clampMax);
+    return { min: min, max: max };
+  }
+
+  function drawLineChart(canvas, points, options) {
+    if (!canvas || !points || points.length < 2) return;
+    var context = canvas.getContext("2d");
+    var ratio = window.devicePixelRatio || 1;
+    var width = canvas.clientWidth;
+    var height = canvas.clientHeight;
+    if (!width || !height) return;
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, width, height);
+
+    var range = chartRange(points.map(function (point) { return point.value; }), options);
+    var min = range.min;
+    var span = range.max - range.min || 1;
+    var padLeft = 34;
+    var padRight = 6;
+    var padTop = 6;
+    var padBottom = 12;
+    var plotWidth = width - padLeft - padRight;
+    var plotHeight = height - padTop - padBottom;
+    // Fixed 10-minute window so the trace scrolls left rather than rescaling.
+    var now = Date.now();
+    var start = now - (options.windowMs || 600000);
+
+    function plotX(time) {
+      return padLeft + Math.max(0, Math.min(1, (time - start) / (now - start))) * plotWidth;
+    }
+    function plotY(value) {
+      return padTop + (1 - Math.max(0, Math.min(1, (value - min) / span))) * plotHeight;
+    }
+
+    context.strokeStyle = "rgba(148, 163, 184, 0.25)";
+    context.fillStyle = "rgba(148, 163, 184, 0.9)";
+    context.lineWidth = 1;
+    context.font = "9px sans-serif";
+    context.textAlign = "right";
+    context.textBaseline = "middle";
+    for (var row = 0; row <= 2; row++) {
+      var value = min + (span / 2) * row;
+      var y = Math.round(plotY(value)) + 0.5;
+      context.beginPath();
+      context.moveTo(padLeft, y);
+      context.lineTo(width - padRight, y);
+      context.stroke();
+      context.fillText(value.toFixed(options.precision || 0) + (options.unit || ""), padLeft - 4, y);
+    }
+
+    var visible = points.filter(function (point) { return point.time >= start; });
+    if (visible.length < 2) return;
+
+    context.beginPath();
+    visible.forEach(function (point, index) {
+      var x = plotX(point.time);
+      var y = plotY(point.value);
+      if (index === 0) context.moveTo(x, y); else context.lineTo(x, y);
+    });
+    // Close down to the baseline for the fill, then re-stroke only the trace so
+    // the baseline edges are not outlined.
+    context.save();
+    context.lineTo(plotX(visible[visible.length - 1].time), padTop + plotHeight);
+    context.lineTo(plotX(visible[0].time), padTop + plotHeight);
+    context.closePath();
+    context.fillStyle = options.fillColor || "rgba(56, 189, 248, 0.12)";
+    context.fill();
+    context.restore();
+
+    context.beginPath();
+    visible.forEach(function (point, index) {
+      var x = plotX(point.time);
+      var y = plotY(point.value);
+      if (index === 0) context.moveTo(x, y); else context.lineTo(x, y);
+    });
+    context.strokeStyle = options.lineColor || "#38bdf8";
+    context.lineWidth = 1.75;
+    context.lineJoin = "round";
+    context.stroke();
+
+    if (options.label) {
+      context.fillStyle = "rgba(226, 232, 240, 0.85)";
+      context.textAlign = "left";
+      context.textBaseline = "top";
+      context.fillText(options.label, padLeft + 4, padTop + 1);
+    }
+  }
+
+  // Apparent wind angle against time, scrolling top (now) to bottom (-10 min).
+  // X axis is signed angle: port to the left of centre, starboard to the right,
+  // both labelled 0-180 degrees in magnitude.
+  function drawWindAngleHistory(canvas, points) {
+    if (!canvas) return;
+    var context = canvas.getContext("2d");
+    var ratio = window.devicePixelRatio || 1;
+    var width = canvas.clientWidth;
+    var height = canvas.clientHeight;
+    if (!width || !height) return;
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, width, height);
+
+    var padX = 8;
+    var padTop = 13;
+    var padBottom = 13;
+    var plotWidth = width - padX * 2;
+    var plotHeight = height - padTop - padBottom;
+    var now = Date.now();
+    var start = now - WIND_HISTORY_MS;
+
+    function plotX(angle) {
+      return padX + ((Math.max(-180, Math.min(180, angle)) + 180) / 360) * plotWidth;
+    }
+    function plotY(time) {
+      return padTop + Math.max(0, Math.min(1, (now - time) / WIND_HISTORY_MS)) * plotHeight;
+    }
+
+    context.fillStyle = "rgba(15, 23, 42, 0.85)";
+    context.fillRect(0, 0, width, height);
+
+    // No-go sector either side of head-to-wind, matching the dial highlight.
+    context.fillStyle = "rgba(100, 116, 139, 0.28)";
+    context.fillRect(plotX(-35), padTop, plotX(35) - plotX(-35), plotHeight);
+
+    context.font = "9px sans-serif";
+    context.textBaseline = "middle";
+    for (var tick = -180; tick <= 180; tick += 45) {
+      var x = Math.round(plotX(tick)) + 0.5;
+      context.beginPath();
+      context.moveTo(x, padTop);
+      context.lineTo(x, padTop + plotHeight);
+      context.strokeStyle = tick === 0 ? "rgba(226, 232, 240, 0.55)" : "rgba(148, 163, 184, 0.22)";
+      context.lineWidth = 1;
+      context.stroke();
+      context.fillStyle = "rgba(148, 163, 184, 0.9)";
+      context.textAlign = tick === -180 ? "left" : tick === 180 ? "right" : "center";
+      context.fillText(String(Math.abs(tick)), x, height - padBottom / 2);
+    }
+
+    context.fillStyle = "rgba(226, 232, 240, 0.85)";
+    context.textAlign = "left";
+    context.fillText("\u25c0 Port", padX, padTop / 2);
+    context.textAlign = "right";
+    context.fillText("Starboard \u25b6", width - padX, padTop / 2);
+    context.textAlign = "center";
+    context.fillText("now", width / 2, padTop / 2);
+    context.fillStyle = "rgba(148, 163, 184, 0.9)";
+    context.fillText("\u221210 min", width / 2, height - padBottom / 2);
+
+    var visible = points.filter(function (point) { return point.time >= start; });
+    if (visible.length < 2) return;
+
+    // Break the trace where the wind crosses dead astern so it does not draw a
+    // false horizontal sweep across the whole plot.
+    context.strokeStyle = "#fbbf24";
+    context.lineWidth = 1.75;
+    context.lineJoin = "round";
+    context.beginPath();
+    var pen = false;
+    for (var index = 0; index < visible.length; index++) {
+      var point = visible[index];
+      var previous = visible[index - 1];
+      if (pen && previous && Math.abs(point.value - previous.value) > 180) {
+        context.stroke();
+        context.beginPath();
+        pen = false;
+      }
+      var px = plotX(point.value);
+      var py = plotY(point.time);
+      if (!pen) {
+        context.moveTo(px, py);
+        pen = true;
+      } else {
+        context.lineTo(px, py);
+      }
+    }
+    context.stroke();
+
+    // Mark the newest sample so the current angle is obvious at a glance.
+    var latest = visible[visible.length - 1];
+    context.beginPath();
+    context.arc(plotX(latest.value), plotY(latest.time), 2.5, 0, Math.PI * 2);
+    context.fillStyle = "#fbbf24";
+    context.fill();
   }
 
   function batteryGaugeState(data, now) {
@@ -178,6 +422,26 @@
       });
       if (!response.ok) throw new Error("Battery data unavailable");
       var state = batteryGaugeState(await response.json(), Date.now());
+      if (state.soc.value !== null && !state.soc.stale) {
+        appendHistory(rollingHistory.batterySoc, { time: Date.now(), value: state.soc.value * 100 }, HISTORY_MS);
+      }
+      if (state.current.value !== null && !state.current.stale) {
+        appendHistory(rollingHistory.batteryCurrent, { time: Date.now(), value: state.current.value }, HISTORY_MS);
+      }
+      var batteryHistory = panel.querySelector(".seabird-battery-history");
+      if (!batteryHistory) {
+        batteryHistory = document.createElement("div");
+        batteryHistory.className = "seabird-battery-history";
+        panel.appendChild(batteryHistory);
+      }
+      drawLineChart(ensureChartCanvas(batteryHistory, "seabird-battery-soc-chart"), rollingHistory.batterySoc, {
+        label: "SoC %", unit: "", precision: 0, lineColor: "#22c55e",
+        fillColor: "rgba(34, 197, 94, 0.14)", clampMin: 0, clampMax: 100, minSpan: 10
+      });
+      drawLineChart(ensureChartCanvas(batteryHistory, "seabird-battery-current-chart"), rollingHistory.batteryCurrent, {
+        label: "Current A", unit: "", precision: 1, lineColor: "#f59e0b",
+        fillColor: "rgba(245, 158, 11, 0.14)", floor: 0, ceiling: 0, minSpan: 5
+      });
       var soc = panel.querySelector(".seabird-soc");
       var meter = panel.querySelector("[role=meter]");
       var percentage = state.soc.value === null ? null : Math.round(state.soc.value * 100);
@@ -393,6 +657,60 @@
     }
   }
 
+  function waterReadingState(data, now) {
+    var environment = data && data.environment ? data.environment : {};
+    var depth = environment.depth && environment.depth.belowTransducer;
+    var temperature = environment.water && environment.water.temperature;
+    function reading(field, convert) {
+      var valid = field && Number.isFinite(field.value);
+      var time = Date.parse(field && field.timestamp);
+      return {
+        value: valid ? (convert ? convert(field.value) : field.value) : null,
+        stale: !valid || !Number.isFinite(time) || now - time > 120000
+      };
+    }
+    return {
+      depth: reading(depth),
+      temperature: reading(temperature, function (kelvin) { return kelvin - 273.15; })
+    };
+  }
+
+  async function refreshWater() {
+    var tile = document.getElementById("seabird-water");
+    if (!tile) return;
+    var panel = tile.querySelector(".seabird-water-panel");
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.className = "seabird-water-panel";
+      panel.setAttribute("aria-label", "Water depth and temperature history");
+      tile.appendChild(panel);
+    }
+    try {
+      var response = await fetch("/signalk/v1/api/vessels/self", {
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!response.ok) throw new Error("Water data unavailable");
+      var state = waterReadingState(await response.json(), Date.now());
+      if (state.depth.value !== null && !state.depth.stale) {
+        appendHistory(rollingHistory.waterDepth, { time: Date.now(), value: state.depth.value }, HISTORY_MS);
+      }
+      if (state.temperature.value !== null && !state.temperature.stale) {
+        appendHistory(rollingHistory.waterTemperature, { time: Date.now(), value: state.temperature.value }, HISTORY_MS);
+      }
+      panel.classList.toggle("seabird-reading-stale", state.depth.stale && state.temperature.stale);
+      drawLineChart(ensureChartCanvas(panel, "seabird-water-depth-chart"), rollingHistory.waterDepth, {
+        label: "Depth m", unit: "", precision: 1, lineColor: "#38bdf8",
+        fillColor: "rgba(56, 189, 248, 0.14)", clampMin: 0, minSpan: 2
+      });
+      drawLineChart(ensureChartCanvas(panel, "seabird-water-temp-chart"), rollingHistory.waterTemperature, {
+        label: "Temp \u00b0C", unit: "", precision: 1, lineColor: "#f472b6",
+        fillColor: "rgba(244, 114, 182, 0.14)", minSpan: 2
+      });
+    } catch (error) {
+      panel.classList.add("seabird-reading-stale");
+    }
+  }
+
   function formatWaterTemperature() {
     var water = document.getElementById("seabird-water");
     if (!water) return;
@@ -483,6 +801,8 @@
   networkObserver.observe(document.body, { childList: true, characterData: true, subtree: true });
   refreshAisTargets();
   setInterval(refreshAisTargets, 10000);
+  refreshWater();
+  setInterval(refreshWater, 10000);
   refreshBattery();
   setInterval(refreshBattery, 10000);
   refreshSolar();
