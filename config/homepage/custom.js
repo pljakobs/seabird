@@ -447,7 +447,9 @@
       if (!batteryHistory) {
         batteryHistory = document.createElement("div");
         batteryHistory.className = "seabird-battery-history";
-        panel.appendChild(batteryHistory);
+        // Directly beneath the instruments so each chart lines up under the
+        // gauge it belongs to, with the voltage/state summary below both.
+        panel.insertBefore(batteryHistory, panel.querySelector(".seabird-battery-summary"));
       }
       drawLineChart(ensureChartCanvas(batteryHistory, "seabird-battery-soc-chart"), rollingHistory.batterySoc, {
         label: "SoC %", unit: "", precision: 0, lineColor: "#22c55e",

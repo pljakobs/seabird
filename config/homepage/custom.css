@@ -212,16 +212,22 @@
   filter: grayscale(1);
   opacity: 0.55;
 }
+/* Chart sits under the dial and matches its width so the two line up. */
 #seabird-wind canvas.seabird-wind-history {
   display: block;
-  width: 100%;
+  width: min(100%, 280px);
   height: 110px;
-  margin-top: 10px;
+  margin: 10px auto 0;
   border-radius: 6px;
 }
 
+/* Three columns matching the Water tile's customapi blocks (depth,
+   temperature, updated) so each chart sits under its own reading. */
 #seabird-water .seabird-water-panel {
-  padding: 4px 12px 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 8px 8px;
 }
 #seabird-water .seabird-water-panel canvas {
   display: block;
@@ -230,19 +236,18 @@
   background: rgba(15, 23, 42, 0.7);
   border-radius: 6px;
 }
-#seabird-water .seabird-water-panel canvas + canvas {
-  margin-top: 6px;
-}
 #seabird-water .seabird-reading-stale {
   filter: grayscale(1);
   opacity: 0.55;
 }
 
+/* Mirrors .seabird-battery-instruments so the SoC chart lines up under the
+   battery symbol and the current chart under the current gauge. */
 #seabird-battery .seabird-battery-history {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 6px;
-  margin-top: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: 16px;
+  margin-top: 10px;
 }
 #seabird-battery .seabird-battery-history canvas {
   display: block;
