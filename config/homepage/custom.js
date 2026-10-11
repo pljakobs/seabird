@@ -140,6 +140,9 @@
     } catch (error) {
       panel.classList.add("seabird-wind-stale");
       panel.querySelector(".seabird-wind-status").textContent = error.message;
+      // Keep the trend plot present when the wind path is missing entirely, so
+      // it reads "no wind data" instead of the graph silently disappearing.
+      drawWindAngleHistory(ensureChartCanvas(panel, "seabird-wind-history"), rollingHistory.wind);
     }
   }
 
