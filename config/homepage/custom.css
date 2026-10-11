@@ -174,7 +174,10 @@
   aspect-ratio: 1;
   margin: 0 auto;
 }
-#seabird-wind canvas {
+/* Scoped to the dial: canvas-gauges renders at a fixed pixel size, so it must
+   be stretched to the dial box. Must not leak to the trend canvas below, which
+   sizes itself. */
+#seabird-wind .seabird-wind-dial canvas {
   width: 100% !important;
   height: 100% !important;
 }
