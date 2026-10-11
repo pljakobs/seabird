@@ -17,18 +17,20 @@
         icon: mdi-waves
         widget:
           type: customapi
-          url: http://host.containers.internal:3000/signalk/v1/api/vessels/self/environment
+          # Query the vessel root, which remains available when environment
+          # sensors have not published data yet.
+          url: http://host.containers.internal:3000/signalk/v1/api/vessels/self
           refreshInterval: 5000
           mappings:
-            - field: depth.belowTransducer.value
+            - field: environment.depth.belowTransducer.value
               label: Transducer Depth
               format: float
               suffix: m
-            - field: water.temperature.value
+            - field: environment.water.temperature.value
               label: Temperature
               format: text
               suffix: K
-            - field: water.temperature.timestamp
+            - field: environment.water.temperature.timestamp
               label: Updated
               format: relativeDate
     - AIS Targets:
