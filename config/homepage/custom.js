@@ -342,7 +342,9 @@
       context.stroke();
       context.fillStyle = "rgba(148, 163, 184, 0.9)";
       context.textAlign = tick === -180 ? "left" : tick === 180 ? "right" : "center";
-      context.fillText(String(Math.abs(tick)), x, height - padBottom / 2);
+      // The centre tick label is skipped: the bolder centre line already marks
+      // head-to-wind, and the "-10 min" caption occupies that slot.
+      if (tick !== 0) context.fillText(String(Math.abs(tick)), x, height - padBottom / 2);
     }
 
     context.fillStyle = "rgba(226, 232, 240, 0.85)";
