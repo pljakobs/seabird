@@ -340,22 +340,43 @@ echo "  resolved stub listener disabled"
 
 echo "Installing NM shared-mode dnsmasq DNS-disable config..."
 NM_DNSMASQ_DIR="/etc/NetworkManager/dnsmasq-shared.d"
+NM_DNSMASQ_SOURCE="${SCRIPT_DIR}/../config/nm-dnsmasq-shared/10-no-dns.conf"
+NM_DNSMASQ_DEST="${NM_DNSMASQ_DIR}/10-no-dns.conf"
 mkdir -p "${NM_DNSMASQ_DIR}"
-install -m 0644 "${SCRIPT_DIR}/../config/nm-dnsmasq-shared/10-no-dns.conf" \
-    "${NM_DNSMASQ_DIR}/10-no-dns.conf"
-echo "  ${NM_DNSMASQ_DIR}/10-no-dns.conf"
+if cmp -s "${NM_DNSMASQ_SOURCE}" "${NM_DNSMASQ_DEST}"; then
+    echo "  ${NM_DNSMASQ_DEST} unchanged — skipping NetworkManager bounce"
+else
+    install -m 0644 "${NM_DNSMASQ_SOURCE}" "${NM_DNSMASQ_DEST}"
+    echo "  installed ${NM_DNSMASQ_DEST}"
 
-# Bounce all shared-mode NM connections so dnsmasq reloads with the new config
-while IFS= read -r con; do
-    [[ -z "${con}" ]] && continue
-    method=$(nmcli -g ipv4.method con show "${con}" 2>/dev/null)
-    if [[ "${method}" == "shared" ]]; then
-        echo "  bouncing shared connection: ${con}"
-        nmcli con down "${con}" 2>/dev/null || true
+    # Reload shared-mode dnsmasq instances while preserving active bridge ports.
+    while IFS= read -r con_uuid; do
+        [[ -z "${con_uuid}" ]] && continue
+        method=$(nmcli -g ipv4.method con show uuid "${con_uuid}" 2>/dev/null)
+        [[ "${method}" == "shared" ]] || continue
+
+        con_name=$(nmcli -g connection.id con show uuid "${con_uuid}")
+        con_iface=$(nmcli -g connection.interface-name con show uuid "${con_uuid}")
+        active_ports=()
+        while IFS= read -r active_uuid; do
+            [[ -z "${active_uuid}" || "${active_uuid}" == "${con_uuid}" ]] && continue
+            master=$(nmcli -g connection.master con show uuid "${active_uuid}" 2>/dev/null || true)
+            if [[ "${master}" == "${con_uuid}" || "${master}" == "${con_name}" || "${master}" == "${con_iface}" ]]; then
+                active_ports+=("${active_uuid}")
+            fi
+        done < <(nmcli -t -f UUID con show --active)
+
+        echo "  bouncing shared connection: ${con_name}"
+        nmcli con down uuid "${con_uuid}"
         sleep 1
-        nmcli con up "${con}" 2>/dev/null || true
-    fi
-done < <(nmcli -t -f NAME con show)
+        nmcli con up uuid "${con_uuid}"
+        for port_uuid in "${active_ports[@]}"; do
+            if ! nmcli -t -f UUID con show --active | grep -Fxq "${port_uuid}"; then
+                nmcli con up uuid "${port_uuid}"
+            fi
+        done
+    done < <(nmcli -t -f UUID con show --active)
+fi
 echo "  NM shared-mode dnsmasq DNS disabled"
 
 # ── avahi mDNS service advertisements ───────────────────────────────────────
