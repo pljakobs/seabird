@@ -13,6 +13,7 @@ shell) so SSIDs/passwords cannot inject commands.
 Endpoints (all under /wifiapi/, routed via Caddy):
   GET  /wifiapi/          — interactive scan/select/connect page (HTML)
   GET  /wifiapi/status    — current upstream connection (JSON)
+  GET  /wifiapi/clients    — associated crew WiFi clients with DHCP data (JSON)
   GET  /wifiapi/scan      — rescan + list available networks, filtered (JSON)
   GET  /wifiapi/widget    — compact status for the Homepage customapi widget
   POST /wifiapi/connect   — body {"ssid": "...", "password": "..."} → connect
@@ -26,6 +27,7 @@ offered as an upstream.
 import http.server
 import json
 import os
+import glob
 import subprocess
 
 LISTEN_ADDR = ("127.0.0.1", 8090)
@@ -222,6 +224,43 @@ def crew_wlan_status():
     return {"up": up, "clients": clients}
 
 
+def crew_clients():
+    """Return associated crew AP stations joined with their DHCP lease data."""
+    leases = {}
+    for path in glob.glob("/var/lib/NetworkManager/dnsmasq-*.leases"):
+        try:
+            with open(path) as lease_file:
+                for line in lease_file:
+                    fields = line.split()
+                    if len(fields) < 4:
+                        continue
+                    expiry, mac, ip, hostname = fields[:4]
+                    leases[mac.lower()] = {
+                        "ip": ip,
+                        "hostname": hostname if hostname != "*" else "",
+                        "lease_expiry": expiry,
+                    }
+        except OSError:
+            continue
+
+    stations = []
+    try:
+        output = run(["iw", "dev", AP_IFACE, "station", "dump"], timeout=10)
+    except Exception:
+        return stations
+    current_mac = None
+    for line in output.splitlines():
+        if line.startswith("Station "):
+            current_mac = line.split()[1].lower()
+            lease = leases.get(current_mac, {})
+            stations.append({
+                "mac": current_mac,
+                "ip": lease.get("ip"),
+                "hostname": lease.get("hostname") or None,
+            })
+    return stations
+
+
 def cellular_status():
     """WWAN modem state via ModemManager (mmcli)."""
     idx = None
@@ -331,12 +370,23 @@ PAGE = """<!doctype html>
   .pw { margin-top:8px; display:flex; gap:8px; }
   .pw input { flex:1; padding:8px; border-radius:6px; border:1px solid #444; background:#111; color:#eee; }
   .msg { padding:12px 16px; font-size:.9rem; }
+  .clients { margin:16px 0 20px; }
+  .clients h2 { font-size:1rem; margin:0 0 8px; }
+  .clients table { width:100%; border-collapse:collapse; font-size:.85rem; }
+  .clients th, .clients td { padding:7px 4px; border-bottom:1px solid #333; text-align:left; }
+  .clients th { color:#9ca3af; font-weight:500; }
+  .clients td { overflow-wrap:anywhere; }
+  .clients-empty { color:#999; font-size:.85rem; }
 </style>
 </head>
 <body>
 <header><h1>Upstream WiFi</h1></header>
 <div class="status" id="status">Loading status…</div>
 <main>
+  <section class="clients" aria-labelledby="clients-title">
+    <h2 id="clients-title">Connected crew clients</h2>
+    <div id="clients-list" class="clients-empty">Loading clients…</div>
+  </section>
   <button class="scan" id="scan">Scan networks</button>
   <div class="msg" id="msg"></div>
   <ul id="list"></ul>
@@ -346,6 +396,7 @@ const api = (p) => new URL(p, location.href).toString();
 const statusEl = document.getElementById('status');
 const listEl = document.getElementById('list');
 const msgEl = document.getElementById('msg');
+const clientsEl = document.getElementById('clients-list');
 
 function signalBars(s) {
   if (s >= 75) return '▂▄▆█';
@@ -363,6 +414,41 @@ async function loadStatus() {
         + (d.ip ? ` — ${d.ip}` : '')
       : `Not connected (${d.interface || 'upstream'})`;
   } catch (e) { statusEl.textContent = 'Status unavailable'; }
+}
+
+function renderClients(clients) {
+  if (!clients.length) {
+    clientsEl.className = 'clients-empty';
+    clientsEl.textContent = 'No WiFi clients connected.';
+    return;
+  }
+  clientsEl.className = '';
+  const table = document.createElement('table');
+  table.innerHTML = '<thead><tr><th>Hostname</th><th>IP address</th><th>MAC address</th></tr></thead>';
+  const body = document.createElement('tbody');
+  for (const client of clients) {
+    const row = document.createElement('tr');
+    for (const value of [client.hostname || 'Unknown', client.ip || 'No DHCP lease', client.mac]) {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.appendChild(cell);
+    }
+    body.appendChild(row);
+  }
+  table.appendChild(body);
+  clientsEl.replaceChildren(table);
+}
+
+async function loadClients() {
+  try {
+    const r = await fetch(api('clients'));
+    const d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'Client list unavailable');
+    renderClients(d.clients || []);
+  } catch (e) {
+    clientsEl.className = 'clients-empty';
+    clientsEl.textContent = 'Client list unavailable';
+  }
 }
 
 function render(nets) {
@@ -451,6 +537,8 @@ async function scan(rescan = true) {
 
 document.getElementById('scan').onclick = () => scan(true);
 loadStatus();
+loadClients();
+setInterval(loadClients, 10000);
 scan(true);
 </script>
 </body>
@@ -507,6 +595,8 @@ class WifiAPIHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(200, {"networks": nets})
             elif path == "/widget":
                 self.send_json(200, widget_payload())
+            elif path == "/clients":
+                self.send_json(200, {"clients": crew_clients()})
             else:
                 self.send_json(404, {"error": "not found"})
         except Exception as exc:
