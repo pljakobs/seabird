@@ -217,6 +217,55 @@ On first run this installs its pinned Python environment, code, unit, and
 installer to enable and start dalymon. The installer protects the real config
 with mode `0600`; runtime logs and Signal K tokens stay outside the repository.
 
+### Epever MPPT monitor
+
+The optional read-only solar monitor is installed separately with
+`sudo bash scripts/install-epevermon.sh`. On first run, copy
+`/etc/epevermon.conf.example` to `/etc/epevermon.conf`, configure the gateway
+and InfluxDB settings, and rerun the installer to enable `epevermon.service`.
+The real config is protected with mode `0600`; tokens and runtime JSONL stay
+outside the repository. Python 3.11+ is required.
+
+The WiFi gateway currently uses `192.168.42.217:9999`, TCP server mode,
+115200/8/N/1 with flow control disabled. `transport = "rtu"` sends Modbus
+serial frames with CRC over TCP; use `"tcp"` only for a gateway explicitly
+configured for Modbus TCP/MBAP. Controller address `1` is the documented
+default. The address may be shown on an optional MT50 under Device Parameter,
+or configured through Solar Station Monitor. Keep the gateway IP stable.
+
+Verify a real controller read without exporting:
+
+```sh
+/root/.local/lib/epevermon/.venv/bin/python /root/.local/lib/epevermon/epevermon.py --config /etc/epevermon.conf --once
+```
+
+An open TCP port is not proof that RS485 communication is working. Timeouts
+require checking the controller connection, address, UART/gateway settings,
+or competing clients. No controller settings or load switches are written.
+Failures are logged and retried with capped backoff; no zero-filled samples
+are published.
+
+Telemetry includes PV voltage/current/power, charging voltage/current/power,
+load readings, temperatures, daily generated energy, and battery/charger
+status and faults. InfluxDB uses measurement `solar_status` with controller
+id/name tags; it may use the same bucket as Daly without changing Daly data.
+The current device configuration reuses Daly's existing InfluxDB settings.
+Approve **Epever solar monitor (epevermon)** under Signal K **Security ->
+Access Requests**. Solar deltas use `electrical.solar.epever` and SI units
+(joules for daily yield, kelvin for temperature), not Daly's battery paths.
+
+The Homepage Solar tile shows PV input, charging output, daily yield, and
+faults, and marks data older than two minutes stale. Its repo-managed sources
+are `config/homepage/services.yaml`, `custom.js`, and `custom.css`.
+Controller ids other than `epever` require changing the tile's API path.
+The [register reference](https://github.com/kasbert/epsolar-tracer/blob/master/archive/1733_modbus_protocol.pdf)
+covers 0x3100/0x310C/0x3110, 0x3200, and 0x330C; confirm model support with a
+successful read before treating live telemetry as operational.
+
+Tests:
+`/root/.local/lib/epevermon/.venv/bin/python -m unittest discover -s scripts -p 'test_epevermon.py'`
+and `node --test scripts/test_homepage_solar.js`.
+
 Homepage's `services.yaml`, `settings.yaml`, `custom.js`, and `custom.css` are
 repo-managed: `install-services.sh` deploys changed files on every run, saving
 the previous config as unique `.bak.*` files. Make persistent customizations in
