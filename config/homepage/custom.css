@@ -41,11 +41,13 @@
   cursor: pointer;
 }
 
+/* Fixed height, not max-height: the target list grows and shrinks as vessels
+   come in and out of range, which made the whole grid row jump. */
 #seabird-ais .seabird-ais-list {
   list-style: none;
   margin: 0;
   padding: 0 12px 8px;
-  max-height: 24rem;
+  height: 240px;
   overflow-y: auto;
   font-size: 0.8rem;
 }
@@ -170,7 +172,7 @@
 }
 #seabird-wind .seabird-wind-dial {
   position: relative;
-  width: min(100%, 280px);
+  width: min(100%, 230px);
   aspect-ratio: 1;
   margin: 0 auto;
 }
@@ -218,8 +220,8 @@
 /* Chart sits under the dial and matches its width so the two line up. */
 #seabird-wind canvas.seabird-wind-history {
   display: block;
-  width: min(100%, 280px);
-  height: 110px;
+  width: min(100%, 230px);
+  height: 100px;
   margin: 10px auto 0;
   border-radius: 6px;
 }
@@ -235,7 +237,7 @@
 #seabird-water .seabird-water-panel canvas {
   display: block;
   width: 100%;
-  height: 56px;
+  height: 120px;
   background: rgba(15, 23, 42, 0.7);
   border-radius: 6px;
 }
@@ -316,4 +318,47 @@
 }
 #seabird-network .seabird-signal-bars[data-level="2"] i.active {
   background: #eab308;
+}
+
+/* ---------------------------------------------------------------------------
+   Instrument grid heights.
+
+   Homepage lays each group out as a CSS grid and sizes every row to its
+   tallest tile. Left alone the tiles have wildly different natural heights
+   (wind ~517px, battery ~348px, AIS ~84px), so rows ended up ragged and the
+   AIS tile resized itself whenever a target appeared or dropped out.
+
+   The Instruments group is ordered in services.yaml so tiles pair up by
+   content weight; each pair is pinned to one height here. Tiles are sized,
+   not just min-sized, so a tile can never grow and shift the row.
+   --------------------------------------------------------------------------- */
+#seabird-wind,
+#seabird-position {
+  min-height: 460px;
+}
+#seabird-battery,
+#seabird-solar {
+  min-height: 360px;
+}
+#seabird-water,
+#seabird-ais {
+  min-height: 300px;
+}
+
+/* Embedded maps. The id beats the widget's Tailwind h-96 class on specificity
+   alone, so the height below wins without !important. */
+#seabird-position iframe {
+  height: 400px;
+  border: 0;
+}
+#seabird-windy iframe {
+  height: 400px;
+  border: 0;
+}
+
+/* The Windy map spans the full Weather row so the two plain links underneath
+   pair with each other instead of being stretched to map height. */
+#seabird-windy {
+  grid-column: 1 / -1;
+  min-height: 460px;
 }

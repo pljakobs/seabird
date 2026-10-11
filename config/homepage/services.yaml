@@ -4,14 +4,37 @@
 # Most hrefs use root-relative paths (/service) so links work regardless of
 # hostname (LAN, tailscale IP, tailscale DNS name).
 
-- Marine:
+# Live instrument tiles are kept in their own group, separate from plain
+# links. Homepage sizes each grid row to its tallest tile, so mixing a 500px
+# instrument with a 68px link stretched the link to match.
+#
+# Order matters: at two columns the tiles pair up as (Wind, Position),
+# (Hausbatterie, Solar), (Water, AIS). Each pair is given a matching height in
+# custom.css, so every row is internally even. Reordering here without
+# updating those rules will make the grid ragged again.
+- Instruments:
     - Wind:
         id: seabird-wind
         icon: mdi-weather-windy
-    - Signal-K:
-        href: /signalk/admin/
-        description: Marine data hub
-        icon: signalk.png
+    - Position:
+        id: seabird-position
+        href: /avnav/
+        description: Own position on the chart plotter
+        icon: mdi-map-marker
+        widget:
+          type: iframe
+          name: avnav-position
+          # Relative URL so it resolves against whichever host the dashboard
+          # was opened on. AvNav sends no X-Frame-Options, so it embeds.
+          src: /avnav/
+          classes: h-96
+          referrerPolicy: same-origin
+    - Hausbatterie:
+        id: seabird-battery
+        icon: mdi-battery
+    - Solar:
+        id: seabird-solar
+        icon: mdi-solar-power
     - Water:
         id: seabird-water
         icon: mdi-waves
@@ -36,12 +59,12 @@
     - AIS Targets:
         id: seabird-ais
         icon: mdi-ferry
-    - Hausbatterie:
-        id: seabird-battery
-        icon: mdi-battery
-    - Solar:
-        id: seabird-solar
-        icon: mdi-solar-power
+
+- Navigation:
+    - Signal-K:
+        href: /signalk/admin/
+        description: Marine data hub
+        icon: signalk.png
     - AvNav:
         href: /avnav
         description: Navigation & chart plotting
@@ -79,6 +102,22 @@
         icon: nextcloud.png
 
 - Weather:
+    # The map spans both columns (see custom.css) so the two links below it
+    # still pair up evenly instead of being stretched to map height.
+    - Windy Map:
+        id: seabird-windy
+        href: https://www.windy.com
+        description: Live wind map at the current position
+        icon: mdi-map-marker-radius
+        widget:
+          type: iframe
+          name: windy
+          # lat/lon default to the BBOX centre used by
+          # scripts/update-avnav-grib-overlay.sh. custom.js rewrites them to the
+          # live Signal K position once a GPS fix is available.
+          src: "https://embed.windy.com/embed2.html?lat=56.500&lon=12.250&detailLat=56.500&detailLon=12.250&zoom=7&level=surface&overlay=wind&product=ecmwf&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=kt&metricTemp=%C2%B0C&radarRange=-1"
+          classes: h-96
+          referrerPolicy: no-referrer
     - Windy:
         href: https://www.windy.com
         description: Global wind and weather maps

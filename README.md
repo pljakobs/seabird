@@ -279,6 +279,39 @@ so a dead sensor freezes the trace rather than drawing a false flat line.
 
 Tests: `node --test scripts/test_homepage_charts.js`.
 
+### Dashboard layout and embedded maps
+
+Homepage renders each group as a CSS grid and sizes every row to its **tallest**
+tile. Mixing live instrument tiles with plain links therefore stretched a 68px
+link to the height of the ~500px Wind tile. Services are split into two groups
+to avoid this:
+
+| Group | Contents |
+|---|---|
+| Instruments | Wind, Position, Hausbatterie, Solar, Water, AIS Targets |
+| Navigation | Signal-K, AvNav, Ocharts, Free Nautical Chart |
+
+At two columns the instrument tiles pair up as (Wind, Position),
+(Hausbatterie, Solar) and (Water, AIS). Each pair is pinned to a matching
+height in `custom.css`, so every row is internally even. **Reordering the
+Instruments group without updating those rules will make the grid ragged
+again.** The AIS list is a fixed height rather than `max-height`, so the row no
+longer jumps as targets come in and out of range.
+
+Two maps are embedded as Homepage `iframe` widgets:
+
+- **Position** (Instruments) — the local AvNav chart plotter at `/avnav/`.
+- **Windy Map** (Weather) — `embed.windy.com`, spanning the full row. It needs
+  internet; offline it simply fails to load.
+
+The Windy embed's coordinates default to the `BBOX` centre used by
+`scripts/update-avnav-grib-overlay.sh` (56.5°N 12.25°E). Once Signal K publishes
+`navigation.position`, `custom.js` recentres the map on the vessel, and only
+when it has moved roughly a kilometre — changing the `src` reloads the whole
+iframe, so GPS jitter must not trigger it.
+
+Tests: `node --test scripts/test_homepage_position.js`.
+
 Homepage's `services.yaml`, `settings.yaml`, `custom.js`, and `custom.css` are
 repo-managed: `install-services.sh` deploys changed files on every run, saving
 the previous config as unique `.bak.*` files. Make persistent customizations in

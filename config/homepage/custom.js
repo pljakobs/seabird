@@ -11,6 +11,7 @@
   var WIND_HISTORY_MS = 600000;
   var windLibrary;
   var windInstrument;
+  var windyPosition;
 
   function networkSignalLevel(percentage) {
     if (!Number.isFinite(percentage) || percentage <= 0) return 0;
@@ -733,6 +734,58 @@
     }
   }
 
+  function setUrlParam(url, key, value) {
+    var pattern = new RegExp("([?&]" + key + "=)[^&]*");
+    return pattern.test(url) ? url.replace(pattern, "$1" + value) : url;
+  }
+
+  function vesselPosition(data) {
+    var position = data && data.navigation && data.navigation.position;
+    var value = position && position.value;
+    if (!value || !Number.isFinite(value.latitude) || !Number.isFinite(value.longitude)) return null;
+    return { lat: value.latitude, lon: value.longitude };
+  }
+
+  // Re-centres the embedded Windy map on the vessel. Changing the src reloads
+  // the whole iframe, so the map is only moved once the boat has travelled
+  // far enough (~1 km) for the shift to be visible at the embed's zoom level.
+  function updateWindyPosition(position) {
+    var tile = document.getElementById("seabird-windy");
+    if (!tile) return;
+    var frame = tile.querySelector("iframe");
+    if (!frame) return;
+    if (
+      windyPosition &&
+      Math.abs(windyPosition.lat - position.lat) < 0.01 &&
+      Math.abs(windyPosition.lon - position.lon) < 0.01
+    ) {
+      return;
+    }
+    windyPosition = position;
+    var lat = position.lat.toFixed(3);
+    var lon = position.lon.toFixed(3);
+    var src = frame.getAttribute("src") || "";
+    var next = setUrlParam(src, "lat", lat);
+    next = setUrlParam(next, "lon", lon);
+    next = setUrlParam(next, "detailLat", lat);
+    next = setUrlParam(next, "detailLon", lon);
+    if (next !== src) frame.setAttribute("src", next);
+  }
+
+  async function refreshPosition() {
+    try {
+      var response = await fetch("/signalk/v1/api/vessels/self", {
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!response.ok) throw new Error("Position unavailable");
+      var position = vesselPosition(await response.json());
+      // No fix: leave the map on the fallback position baked into services.yaml.
+      if (position) updateWindyPosition(position);
+    } catch (error) {
+      /* Keep the last good position rather than resetting the map. */
+    }
+  }
+
   function formatWaterTemperature() {
     var water = document.getElementById("seabird-water");
     if (!water) return;
@@ -831,4 +884,6 @@
   setInterval(refreshSolar, 10000);
   refreshWind();
   setInterval(refreshWind, 5000);
+  refreshPosition();
+  setInterval(refreshPosition, 60000);
 })();
