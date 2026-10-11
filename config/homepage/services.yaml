@@ -9,9 +9,10 @@
 # instrument with a 68px link stretched the link to match.
 #
 # Order matters: at two columns the tiles pair up as (Wind, Position),
-# (Hausbatterie, Solar), (Water, AIS). Each pair is given a matching height in
-# custom.css, so every row is internally even. Reordering here without
-# updating those rules will make the grid ragged again.
+# (Hausbatterie, Solar), (Water, AIS), followed by a full-width Upstream WiFi
+# status row. Each pair is given a matching height in custom.css, so every row
+# is internally even. Reordering here without updating those rules will make
+# the grid ragged again.
 - Instruments:
     - Wind:
         id: seabird-wind
@@ -59,6 +60,30 @@
     - AIS Targets:
         id: seabird-ais
         icon: mdi-ferry
+    - Upstream WiFi:
+        id: seabird-network
+        # Interactive scan/select/connect page served by seabird-wifi-api on the
+        # host (nmcli bridge). The customapi widget below is read-only status.
+        href: /wifiapi/
+        description: Marina / harbour WiFi
+        icon: mdi-wifi
+        widget:
+          type: customapi
+          # Homepage fetches this server-side from inside its container (bridge
+          # network), so it must reach the host via host.containers.internal and
+          # go through Caddy — the API itself binds host loopback only.
+          url: http://host.containers.internal/wifiapi/widget
+          refreshInterval: 10000
+          mappings:
+            # Status colour is carried as a leading emoji in each value, since
+            # customapi cannot colour fields or show tooltips. Click the tile to
+            # open the scan/connect page.
+            - field: crew
+              label: Crew WLAN
+            - field: upstream
+              label: Upstream WiFi
+            - field: cellular
+              label: Cellular
 
 - Navigation:
     - Signal-K:
@@ -141,27 +166,3 @@
         href: /cockpit
         description: System admin
         icon: cockpit.png
-    - Upstream WiFi:
-        id: seabird-network
-        # Interactive scan/select/connect page served by seabird-wifi-api on the
-        # host (nmcli bridge). The customapi widget below is read-only status.
-        href: /wifiapi/
-        description: Marina / harbour WiFi
-        icon: mdi-wifi
-        widget:
-          type: customapi
-          # Homepage fetches this server-side from inside its container (bridge
-          # network), so it must reach the host via host.containers.internal and
-          # go through Caddy — the API itself binds host loopback only.
-          url: http://host.containers.internal/wifiapi/widget
-          refreshInterval: 10000
-          mappings:
-            # Status colour is carried as a leading emoji in each value, since
-            # customapi cannot colour fields or show tooltips. Click the tile to
-            # open the scan/connect page.
-            - field: crew
-              label: Crew WLAN
-            - field: upstream
-              label: Upstream WiFi
-            - field: cellular
-              label: Cellular

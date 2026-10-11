@@ -329,8 +329,7 @@
    AIS tile resized itself whenever a target appeared or dropped out.
 
    The Instruments group is ordered in services.yaml so tiles pair up by
-   content weight; each pair is pinned to one height here. Tiles are sized,
-   not just min-sized, so a tile can never grow and shift the row.
+   content weight; each pair has a matching minimum height here.
    --------------------------------------------------------------------------- */
 #seabird-wind,
 #seabird-position {
@@ -343,6 +342,10 @@
 #seabird-water,
 #seabird-ais {
   min-height: 300px;
+}
+#seabird-network {
+  grid-column: 1 / -1;
+  min-height: 164px;
 }
 
 /* Embedded maps. The id beats the widget's Tailwind h-96 class on specificity

@@ -288,15 +288,16 @@ to avoid this:
 
 | Group | Contents |
 |---|---|
-| Instruments | Wind, Position, Hausbatterie, Solar, Water, AIS Targets |
+| Instruments | Wind, Position, Hausbatterie, Solar, Water, AIS Targets, Upstream WiFi |
 | Navigation | Signal-K, AvNav, Ocharts, Free Nautical Chart |
 
 At two columns the instrument tiles pair up as (Wind, Position),
-(Hausbatterie, Solar) and (Water, AIS). Each pair is pinned to a matching
-height in `custom.css`, so every row is internally even. **Reordering the
-Instruments group without updating those rules will make the grid ragged
-again.** The AIS list is a fixed height rather than `max-height`, so the row no
-longer jumps as targets come in and out of range.
+(Hausbatterie, Solar) and (Water, AIS), followed by a full-width Upstream WiFi
+status row. Each pair has a matching minimum height in `custom.css`, so every
+row is internally even. **Reordering the Instruments group without updating
+those rules will make the grid ragged again.** The AIS list is a fixed height
+rather than `max-height`, so the row no longer jumps as targets come in and out
+of range.
 
 Two maps are embedded as Homepage `iframe` widgets:
 
