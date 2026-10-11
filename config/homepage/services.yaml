@@ -66,14 +66,6 @@
         href: /grafana
         description: Charts & dashboards
         icon: grafana.png
-        widget:
-          type: grafana
-          version: 2
-          # Fetched server-side from inside the container (bridge network), so it
-          # must reach the host via host.containers.internal, not 127.0.0.1.
-          url: http://host.containers.internal:3001
-          headers:
-            Authorization: Bearer {{HOMEPAGE_VAR_GRAFANA_TOKEN}}
 
 - Entertainment:
     - Navidrome:
