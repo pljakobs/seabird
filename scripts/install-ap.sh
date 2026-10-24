@@ -147,16 +147,27 @@ nmcli con add \
 
 nmcli con modify "${NM_CONN}" \
     802-11-wireless.band "${BAND}" \
+    802-11-wireless.channel $([ "${BAND}" = "a" ] && echo "36" || echo "6") \
     802-11-wireless-security.key-mgmt wpa-psk \
-    802-11-wireless-security.proto rsn \
-    802-11-wireless-security.group ccmp \
-    802-11-wireless-security.pairwise ccmp \
-    802-11-wireless-security.pmf 1 \
     802-11-wireless-security.psk "${PASSWORD}" \
+    802-11-wireless-security.pmf 0 \
     ipv4.method shared \
     ipv4.addresses "${AP_IP}" \
     ipv6.method disabled \
     connection.autoconnect yes
+
+#nmcli con modify "${NM_CONN}" \
+#    802-11-wireless.band "${BAND}" \
+#    802-11-wireless-security.key-mgmt wpa-psk \
+#    802-11-wireless-security.proto rsn \
+#    802-11-wireless-security.group ccmp \
+#    802-11-wireless-security.pairwise ccmp \
+#    802-11-wireless-security.pmf 1 \
+#    802-11-wireless-security.psk "${PASSWORD}" \
+#    ipv4.method shared \
+#    ipv4.addresses "${AP_IP}" \
+#    ipv6.method disabled \
+#    connection.autoconnect yes
 
 # Bind the AP profile to the physical card by permanent MAC so a boot-time wlan
 # name swap can never let an upstream client profile steal this radio.
