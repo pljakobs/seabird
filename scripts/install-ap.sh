@@ -149,6 +149,9 @@ nmcli con modify "${NM_CONN}" \
     802-11-wireless.band "${BAND}" \
     802-11-wireless.channel $([ "${BAND}" = "a" ] && echo "36" || echo "6") \
     802-11-wireless-security.key-mgmt wpa-psk \
+    802-11-wireless-security.proto rsn \
+    802-11-wireless-security.pairwise ccmp \
+    802-11-wireless-security.group ccmp \
     802-11-wireless-security.psk "${PASSWORD}" \
     802-11-wireless-security.pmf 0 \
     ipv4.method shared \
