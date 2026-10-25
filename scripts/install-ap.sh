@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# install-ap.sh — configure wlp6s0 as a WiFi access point for the crew LAN
+# install-ap.sh — configure wlp6s0 as a WiFi access point bridged to br-crew
 #
-# Uses NetworkManager with ipv4.method=shared which also runs a dnsmasq
-# instance for DHCP and DNS on the AP interface.
+# Uses NetworkManager with ipv4.method=shared on br-crew which runs a dnsmasq
+# instance for DHCP and DNS, with wlp6s0 operating as a bridge slave.
 #
 # Usage:
 #   sudo scripts/install-ap.sh
@@ -20,6 +20,7 @@ set -euo pipefail
 
 AP_IFACE="wlp6s0"
 NM_CONN="seabird-ap"
+BRIDGE_CONN="br-crew"
 SEABIRD_AP_CONF="/etc/NetworkManager/dnsmasq-shared.d/seabird-ap.conf"
 
 SSID=""
@@ -51,7 +52,7 @@ fi
 
 if nmcli con show "${NM_CONN}" &>/dev/null; then
     EXISTING_SSID=$(nmcli -g 802-11-wireless.ssid con show "${NM_CONN}" 2>/dev/null || true)
-    EXISTING_IP=$(nmcli -g ipv4.addresses con show "${NM_CONN}" 2>/dev/null || true)
+    EXISTING_IP=$(nmcli -g ipv4.addresses con show "${BRIDGE_CONN}" 2>/dev/null || true)
     echo "AP '${NM_CONN}' is already configured:"
     echo "  SSID : ${EXISTING_SSID}"
     echo "  IP   : ${EXISTING_IP}"
@@ -120,30 +121,47 @@ DHCP_START="${AP_BASE}.10"
 DHCP_END="${AP_BASE}.200"
 
 echo
-echo "Configuring AP:"
+echo "Configuring Bridged AP:"
 echo "  Interface : ${AP_IFACE}"
+echo "  Bridge    : ${BRIDGE_CONN}"
 echo "  SSID      : ${SSID}"
 echo "  Band      : ${BAND} ($([ "${BAND}" = "a" ] && echo "5 GHz" || echo "2.4 GHz"))"
-echo "  AP IP     : ${AP_IP}"
+echo "  Bridge IP : ${AP_IP}"
 echo "  DHCP      : ${DHCP_START} – ${DHCP_END}"
 echo
 
-# ── remove existing connection ────────────────────────────────────────────────
+# ── Ensure br-crew bridge connection exists and configure shared IP ───────────
+
+if ! nmcli con show "${BRIDGE_CONN}" &>/dev/null; then
+    echo "Creating NetworkManager profile for bridge ${BRIDGE_CONN}..."
+    nmcli con add type bridge con-name "${BRIDGE_CONN}" ifname br-crew stp no
+fi
+
+echo "Configuring bridge IP and shared DHCP on ${BRIDGE_CONN}..."
+nmcli con modify "${BRIDGE_CONN}" \
+    ipv4.method shared \
+    ipv4.addresses "${AP_IP}" \
+    ipv6.method disabled \
+    connection.autoconnect yes
+
+# ── remove existing AP connection ─────────────────────────────────────────────
 
 if nmcli con show "${NM_CONN}" &>/dev/null; then
     echo "Removing existing '${NM_CONN}' connection..."
     nmcli con delete "${NM_CONN}"
 fi
 
-# ── create AP connection ──────────────────────────────────────────────────────
+# ── create AP connection as a bridge slave ────────────────────────────────────
 
-echo "Creating AP connection..."
+echo "Creating bridged AP connection..."
 nmcli con add \
     type wifi \
     ifname "${AP_IFACE}" \
     con-name "${NM_CONN}" \
     ssid "${SSID}" \
-    mode ap
+    mode ap \
+    slave-type bridge \
+    master "${BRIDGE_CONN}"
 
 nmcli con modify "${NM_CONN}" \
     802-11-wireless.band "${BAND}" \
@@ -154,23 +172,7 @@ nmcli con modify "${NM_CONN}" \
     802-11-wireless-security.group ccmp \
     802-11-wireless-security.psk "${PASSWORD}" \
     802-11-wireless-security.pmf 0 \
-    ipv4.method shared \
-    ipv4.addresses "${AP_IP}" \
-    ipv6.method disabled \
     connection.autoconnect yes
-
-#nmcli con modify "${NM_CONN}" \
-#    802-11-wireless.band "${BAND}" \
-#    802-11-wireless-security.key-mgmt wpa-psk \
-#    802-11-wireless-security.proto rsn \
-#    802-11-wireless-security.group ccmp \
-#    802-11-wireless-security.pairwise ccmp \
-#    802-11-wireless-security.pmf 1 \
-#    802-11-wireless-security.psk "${PASSWORD}" \
-#    ipv4.method shared \
-#    ipv4.addresses "${AP_IP}" \
-#    ipv6.method disabled \
-#    connection.autoconnect yes
 
 # Bind the AP profile to the physical card by permanent MAC so a boot-time wlan
 # name swap can never let an upstream client profile steal this radio.
@@ -215,9 +217,10 @@ fi
 
 # ── bring it up ───────────────────────────────────────────────────────────────
 
-echo "Activating AP..."
+echo "Activating bridge and AP..."
+nmcli con up "${BRIDGE_CONN}"
 nmcli con up "${NM_CONN}"
 
 echo
-echo "AP '${SSID}' is active on ${AP_IFACE} (${AP_IP})"
+echo "Bridged AP '${SSID}' is active on ${AP_IFACE} slaved to ${BRIDGE_CONN} (${AP_IP})"
 echo "DHCP range: ${DHCP_START} – ${DHCP_END}"
